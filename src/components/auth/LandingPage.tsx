@@ -19,7 +19,7 @@ export const LandingPage: React.FC = () => {
     loginDeveloper,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'login' | 'register' | null>(null);
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
 
   // Estados de Palavra-passe da Área de Programador
   const [isDevModalOpen, setIsDevModalOpen] = useState(false);
@@ -145,14 +145,14 @@ export const LandingPage: React.FC = () => {
       {/* Centro: Botões de Entrar no meu salão e Registar-me */}
       <main className="flex-1 max-w-xl w-full mx-auto px-4 sm:px-6 py-10 flex flex-col items-center justify-center">
         <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
-          <div className={`flex flex-col sm:flex-row p-4 gap-3 ${activeTab ? 'border-b border-slate-200 bg-slate-50/60' : ''}`}>
+          <div className="flex flex-col sm:flex-row p-4 gap-3 border-b border-slate-200 bg-slate-50/60">
             <button
               type="button"
               onClick={() => setActiveTab('login')}
-              className={`flex-1 py-4 px-5 rounded-2xl font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-2.5 ${
+              className={`flex-1 py-3.5 px-5 rounded-2xl font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-2.5 ${
                 activeTab === 'login'
                   ? 'bg-purple-600 text-white shadow-md shadow-purple-200'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-200'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
               }`}
             >
               <Lock className="w-4 h-4" />
@@ -162,10 +162,10 @@ export const LandingPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTab('register')}
-              className={`flex-1 py-4 px-5 rounded-2xl font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-2.5 ${
+              className={`flex-1 py-3.5 px-5 rounded-2xl font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-2.5 ${
                 activeTab === 'register'
                   ? 'bg-purple-600 text-white shadow-md shadow-purple-200'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
               }`}
             >
               <Store className="w-4 h-4" />
@@ -399,6 +399,9 @@ export const LandingPage: React.FC = () => {
                       {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+                  <span className="text-[11px] text-slate-500 mt-1.5 block">
+                    Nota: novos salões criados na consola têm palavra-passe predefinida <code className="text-purple-700 bg-purple-50 px-1 py-0.5 rounded font-mono font-bold">admin123</code>.
+                  </span>
                 </div>
               </div>
 

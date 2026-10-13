@@ -11,6 +11,7 @@ import {
   XCircle,
   Trash2,
   Eye,
+  EyeOff,
   LogOut,
   Search,
   Euro,
@@ -51,6 +52,13 @@ export const DeveloperPortalView: React.FC = () => {
   const [newSalonNif, setNewSalonNif] = useState('');
   const [newSalonAdminName, setNewSalonAdminName] = useState('');
   const [newSalonAdminEmail, setNewSalonAdminEmail] = useState('');
+  const [newSalonAdminPassword, setNewSalonAdminPassword] = useState('admin123');
+  const [showNewSalonPassword, setShowNewSalonPassword] = useState(false);
+  const [createdSalonCredentials, setCreatedSalonCredentials] = useState<{
+    salonName: string;
+    email: string;
+    password: string;
+  } | null>(null);
 
   // Modal para alterar palavra-passe do programador (Master)
   const [isDevPasswordModalOpen, setIsDevPasswordModalOpen] = useState(false);
@@ -132,25 +140,35 @@ export const DeveloperPortalView: React.FC = () => {
     e.preventDefault();
     if (!newSalonName || !newSalonPhone || !newSalonAdminName || !newSalonAdminEmail) return;
 
-    await registerNewSalon(
+    const chosenPassword = newSalonAdminPassword.trim() || 'admin123';
+    const ok = await registerNewSalon(
       {
-        name: newSalonName,
-        phone: newSalonPhone,
-        address: newSalonAddress || 'Morada indicada pelo programador',
-        nif: newSalonNif,
-        adminName: newSalonAdminName,
-        adminEmail: newSalonAdminEmail,
+        name: newSalonName.trim(),
+        phone: newSalonPhone.trim(),
+        address: newSalonAddress.trim() || 'Morada indicada pelo programador',
+        nif: newSalonNif.trim(),
+        adminName: newSalonAdminName.trim(),
+        adminEmail: newSalonAdminEmail.trim().toLowerCase(),
+        adminPassword: chosenPassword,
       },
       { stayInCurrentMode: true }
     );
 
-    setIsNewSalonModalOpen(false);
-    setNewSalonName('');
-    setNewSalonPhone('');
-    setNewSalonAddress('');
-    setNewSalonNif('');
-    setNewSalonAdminName('');
-    setNewSalonAdminEmail('');
+    if (ok) {
+      setCreatedSalonCredentials({
+        salonName: newSalonName.trim(),
+        email: newSalonAdminEmail.trim().toLowerCase(),
+        password: chosenPassword,
+      });
+      setIsNewSalonModalOpen(false);
+      setNewSalonName('');
+      setNewSalonPhone('');
+      setNewSalonAddress('');
+      setNewSalonNif('');
+      setNewSalonAdminName('');
+      setNewSalonAdminEmail('');
+      setNewSalonAdminPassword('admin123');
+    }
   };
 
   // Alterar Palavra-passe Master do Programador
@@ -446,6 +464,10 @@ export const DeveloperPortalView: React.FC = () => {
                               <Mail className="w-3 h-3 text-slate-500" />
                               <span>{item.adminUser.email}</span>
                             </div>
+                            <div className="text-[10px] text-purple-300 font-mono mt-0.5 flex items-center gap-1">
+                              <Key className="w-2.5 h-2.5 text-purple-400" />
+                              <span>Senha: <strong>{item.adminUser.password || 'admin123'}</strong></span>
+                            </div>
                           </div>
                         ) : (
                           <span className="text-slate-500 italic">Sem administrador</span>
@@ -680,20 +702,47 @@ export const DeveloperPortalView: React.FC = () => {
                     className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
                   />
                 </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      E-mail do Admin *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="email@salao.pt"
-                      value={newSalonAdminEmail}
-                      onChange={(e) => setNewSalonAdminEmail(e.target.value)}
-                      className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    E-mail do Admin *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="email@salao.pt"
+                    value={newSalonAdminEmail}
+                    onChange={(e) => setNewSalonAdminEmail(e.target.value)}
+                    className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
+                  />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                  Palavra-passe do Administrador *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewSalonPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Palavra-passe..."
+                    value={newSalonAdminPassword}
+                    onChange={(e) => setNewSalonAdminPassword(e.target.value)}
+                    className="w-full pl-3 pr-10 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewSalonPassword(!showNewSalonPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 cursor-pointer transition-colors"
+                    title={showNewSalonPassword ? 'Ocultar palavra-passe' : 'Mostrar palavra-passe'}
+                  >
+                    {showNewSalonPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  Palavra-passe de acesso a este salão (padrão: <code className="text-purple-300 bg-slate-800 px-1 py-0.5 rounded">admin123</code>).
+                </span>
+              </div>
 
               <div className="flex items-center gap-2 pt-3">
                 <button
@@ -711,6 +760,46 @@ export const DeveloperPortalView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação com Credenciais do Novo Salão */}
+      {createdSalonCredentials && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-800 border border-emerald-500/50 rounded-3xl max-w-md w-full p-6 shadow-2xl text-slate-100 animate-in fade-in duration-200 text-center">
+            <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-white">
+              Salão Registado com Sucesso!
+            </h3>
+            <p className="text-xs text-slate-300 mt-1">
+              O salão foi gravado no sistema. Guarde as credenciais de acesso:
+            </p>
+            <div className="mt-4 p-4 bg-slate-900 rounded-2xl border border-slate-700 text-left space-y-2.5 font-mono text-xs">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-1.5">
+                <span className="text-slate-400 font-sans">Nome do Salão:</span>
+                <span className="text-white font-bold">{createdSalonCredentials.salonName}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-slate-800 pb-1.5">
+                <span className="text-slate-400 font-sans">E-mail:</span>
+                <span className="text-purple-300 font-bold">{createdSalonCredentials.email}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-sans">Palavra-passe:</span>
+                <span className="text-emerald-400 font-bold">{createdSalonCredentials.password}</span>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-3">
+              O administrador deste salão já pode iniciar sessão diretamente na página de entrada.
+            </p>
+            <button
+              onClick={() => setCreatedSalonCredentials(null)}
+              className="mt-4 w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow-md transition-colors"
+            >
+              Compreendi e Guardei
+            </button>
           </div>
         </div>
       )}

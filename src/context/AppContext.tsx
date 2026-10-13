@@ -621,6 +621,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logoutDeveloper = () => {
+    setIsAdminUnlocked(false);
     setIsDevLoggedIn(false);
     setIsImpersonating(false);
     clearActiveSession();
@@ -664,8 +665,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const returnToDeveloperPortal = () => {
     setIsImpersonating(false);
+    setIsDevLoggedIn(true);
     setAppMode('developer');
+    saveActiveSession({ appMode: 'developer', salonId: currentSalonId, userId: currentUserId });
     refreshAllSalonsSummary();
+    showNotification('info', 'Regresso à Consola do Programador.');
   };
 
   // Registo de novo salão isolado
@@ -693,8 +697,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUserIdState(adminUser.id);
         setAppMode('salon');
         saveActiveSession({ appMode: 'salon', salonId: salon.id, userId: adminUser.id });
+        showNotification('success', `Salão "${salon.name}" registado com sucesso! Acedendo à agenda...`);
+      } else {
+        showNotification('success', `Salão "${salon.name}" registado com sucesso no sistema!`);
       }
-      showNotification('success', `Salão "${salon.name}" registado com sucesso!`);
       return true;
     } catch (err: any) {
       showNotification('error', err.message || 'Erro ao registar salão.');

@@ -25,6 +25,7 @@ export const Navbar: React.FC = () => {
     isImpersonating,
     returnToDeveloperPortal,
     logoutCurrentSalon,
+    logoutDeveloper,
     activeTab,
     setActiveTab,
     isAdminUnlocked,
@@ -47,12 +48,20 @@ export const Navbar: React.FC = () => {
     }
   };
 
+  const handleLogout = () => {
+    if (isImpersonating) {
+      logoutDeveloper();
+    } else {
+      logoutCurrentSalon();
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
       {/* Banner de Inspeção do Programador */}
       {isImpersonating && (
         <div className="bg-purple-950 text-purple-100 px-4 py-2 text-xs font-bold border-b border-purple-800">
-          <div className="flex items-center justify-between max-w-7xl mx-auto w-full gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between max-w-7xl mx-auto w-full gap-2">
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-purple-400 shrink-0" />
               <span>
@@ -60,13 +69,22 @@ export const Navbar: React.FC = () => {
                 <span className="text-white underline">{currentSalon?.name}</span> ({currentSalon?.status})
               </span>
             </div>
-            <button
-              onClick={returnToDeveloperPortal}
-              className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center gap-1 shadow-xs"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Voltar à Consola
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={returnToDeveloperPortal}
+                className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center gap-1 shadow-xs"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Voltar à Consola
+              </button>
+              <button
+                onClick={logoutDeveloper}
+                className="px-3 py-1 bg-rose-600/80 hover:bg-rose-600 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center gap-1 shadow-xs"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Sair para Início
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -176,8 +194,8 @@ export const Navbar: React.FC = () => {
 
             {/* Botão Sair / Terminar Sessão do Salão */}
             <button
-              onClick={logoutCurrentSalon}
-              title="Sair do salão e voltar à Página de Entrada"
+              onClick={handleLogout}
+              title={isImpersonating ? "Sair da inspeção e voltar à Página de Entrada" : "Sair do salão e voltar à Página de Entrada"}
               className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
