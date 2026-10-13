@@ -44,12 +44,20 @@ export class ApiService {
     return {
       ...s,
       status: s.status || 'ATIVO',
+      primaryColor: s.primaryColor || mockMatch?.primaryColor || '#8B5CF6',
+      logoUrl: s.logoUrl || mockMatch?.logoUrl,
       createdAt: s.createdAt || mockMatch?.createdAt || new Date().toISOString(),
     };
   });
   private users: User[] = loadInitial(STORAGE_KEYS.USERS, mockUsers);
   private services: Service[] = loadInitial(STORAGE_KEYS.SERVICES, mockServices);
-  private clients: Client[] = loadInitial(STORAGE_KEYS.CLIENTS, mockClients);
+  private clients: Client[] = loadInitial(STORAGE_KEYS.CLIENTS, mockClients).map((c) => {
+    const mockMatch = mockClients.find((m) => m.id === c.id);
+    return {
+      ...c,
+      photoUrl: c.photoUrl || mockMatch?.photoUrl,
+    };
+  });
   private appointments: Appointment[] = loadInitial(STORAGE_KEYS.APPOINTMENTS, mockAppointments);
 
   // URL base configurável para o backend no servidor do utilizador
@@ -78,6 +86,14 @@ export class ApiService {
     this.salons.push(newSalon);
     saveToStorage(STORAGE_KEYS.SALONS, this.salons);
     return newSalon;
+  }
+
+  async updateSalon(salonId: string, updates: Partial<Salon>): Promise<Salon> {
+    const idx = this.salons.findIndex((s) => s.id === salonId);
+    if (idx === -1) throw new Error('Salão não encontrado.');
+    this.salons[idx] = { ...this.salons[idx], ...updates };
+    saveToStorage(STORAGE_KEYS.SALONS, this.salons);
+    return this.salons[idx];
   }
 
   async registerSalon(params: {

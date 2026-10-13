@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Scissors,
@@ -13,7 +13,9 @@ import {
   LogOut,
   ArrowLeft,
   Lock,
+  Palette,
 } from 'lucide-react';
+import { SalonCustomizationModal } from '../salon/SalonCustomizationModal';
 
 export const Navbar: React.FC = () => {
   const {
@@ -31,6 +33,8 @@ export const Navbar: React.FC = () => {
     setActiveTab,
     isAdminUnlocked,
   } = useApp();
+
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
 
   const handleAdminClick = () => {
     if (currentUser?.role === 'ADMIN') {
@@ -74,29 +78,61 @@ export const Navbar: React.FC = () => {
       )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo & Marca */}
+          {/* Logo & Marca (Aparece no início da página do lado esquerdo) */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-purple-200">
-              <Scissors className="w-5 h-5 transform -rotate-45" />
-            </div>
+            {currentSalon?.logoUrl ? (
+              <img
+                src={currentSalon.logoUrl}
+                alt={currentSalon.name}
+                className="w-11 h-11 rounded-xl object-contain border border-slate-200 bg-white shadow-xs p-1 shrink-0"
+              />
+            ) : (
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md shrink-0 transition-colors"
+                style={{
+                  backgroundColor: currentSalon?.primaryColor || '#8B5CF6',
+                  boxShadow: `0 4px 6px -1px ${
+                    currentSalon?.primaryColor ? currentSalon.primaryColor + '40' : '#8B5CF640'
+                  }`,
+                }}
+              >
+                <Scissors className="w-5 h-5 transform -rotate-45" />
+              </div>
+            )}
             <div>
               <span className="font-bold text-lg text-slate-900 tracking-tight flex items-center gap-2">
-                SalonMaster Pro
+                {currentSalon?.name || 'SalonMaster Pro'}
               </span>
               <p className="text-xs text-slate-500 hidden sm:block">Gestão de Clientes, Reservas & Equipa</p>
             </div>
           </div>
 
           {/* Salão Ativo (Isolado) & Controlos */}
-          <div className="flex items-center gap-3">
-            {/* Salão Atual - Apenas mostra o salão em que se encontra, sem ver a lista dos outros */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Botão Personalizar Salão (Apenas para o Administrador) */}
+            {currentUser?.role === 'ADMIN' && (
+              <button
+                type="button"
+                onClick={() => setIsCustomizationOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200 hover:border-purple-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                title="Personalizar logótipo e cores do seu salão"
+              >
+                <Palette
+                  className="w-3.5 h-3.5 shrink-0"
+                  style={{ color: currentSalon?.primaryColor || '#8B5CF6' }}
+                />
+                <span className="hidden md:inline">Personalizar Salão</span>
+              </button>
+            )}
+
+            {/* Salão Atual - Apenas mostra o salão em que se encontra */}
             <div className="flex items-center gap-2 bg-purple-50/70 border border-purple-200/80 rounded-xl px-3 py-1.5">
               <Store className="w-4 h-4 text-purple-600 shrink-0" />
               <div className="flex flex-col">
                 <span className="text-[10px] text-purple-600 font-semibold uppercase tracking-wider leading-none">
                   Salão Ativo:
                 </span>
-                <span className="text-xs font-bold text-slate-900 truncate max-w-[150px] sm:max-w-[200px]">
+                <span className="text-xs font-bold text-slate-900 truncate max-w-[120px] sm:max-w-[180px]">
                   {currentSalon?.name || 'O Meu Salão'}
                 </span>
               </div>
@@ -205,6 +241,11 @@ export const Navbar: React.FC = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Modal de Personalização de Cores e Logótipo do Salão */}
+      {isCustomizationOpen && (
+        <SalonCustomizationModal onClose={() => setIsCustomizationOpen(false)} />
       )}
     </header>
   );

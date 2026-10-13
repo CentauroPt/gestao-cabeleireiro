@@ -25,7 +25,9 @@ import {
   RotateCcw,
   Eye,
   EyeOff,
+  Palette,
 } from 'lucide-react';
+import { SalonCustomizationModal } from '../salon/SalonCustomizationModal';
 
 type ReportTab = 'clients' | 'daily' | 'monthly' | 'staff';
 
@@ -80,6 +82,7 @@ export const AdminReportsView: React.FC = () => {
   const [inputPassword, setInputPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
 
   // Estados dos Relatórios
   const [activeReportTab, setActiveReportTab] = useState<ReportTab>('clients');
@@ -403,7 +406,15 @@ export const AdminReportsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start md:self-center">
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
+          <button
+            onClick={() => setIsCustomizationOpen(true)}
+            className="px-3.5 py-2 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:opacity-95"
+            style={{ backgroundColor: currentSalon?.primaryColor || '#8B5CF6' }}
+            title="Personalizar as cores e logótipo do seu salão"
+          >
+            <Palette className="w-4 h-4" /> Personalizar Cores & Logótipo
+          </button>
           <button
             onClick={() => window.print()}
             className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -418,6 +429,48 @@ export const AdminReportsView: React.FC = () => {
             <LogOut className="w-4 h-4" /> Encerrar Acesso Admin
           </button>
         </div>
+      </div>
+
+      {/* Cartão de Personalização do Salão no Painel de Administrador */}
+      <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-slate-50 border border-purple-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          {currentSalon?.logoUrl ? (
+            <img
+              src={currentSalon.logoUrl}
+              alt={currentSalon.name}
+              className="w-12 h-12 rounded-xl object-contain bg-white border border-slate-200 shadow-xs p-1 shrink-0"
+            />
+          ) : (
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md shrink-0"
+              style={{ backgroundColor: currentSalon?.primaryColor || '#8B5CF6' }}
+            >
+              <Scissors className="w-6 h-6 transform -rotate-45" />
+            </div>
+          )}
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+              Identidade Visual do Salão ({currentSalon?.name})
+              <span
+                className="w-3.5 h-3.5 rounded-full inline-block shadow-xs border border-white"
+                style={{ backgroundColor: currentSalon?.primaryColor || '#8B5CF6' }}
+                title={`Cor principal: ${currentSalon?.primaryColor || '#8B5CF6'}`}
+              />
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Personalize as cores e o logótipo exclusivo do seu salão de cabeleireiro. O logótipo surge no topo esquerdo da página.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsCustomizationOpen(true)}
+          className="px-4 py-2.5 bg-white hover:bg-purple-50 text-slate-800 hover:text-purple-700 border border-slate-200 hover:border-purple-300 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-2 shrink-0"
+        >
+          <Palette className="w-4 h-4 text-purple-600" />
+          <span>Alterar Cores & Logótipo</span>
+        </button>
       </div>
 
       {/* ======================================================== */}
@@ -1659,6 +1712,11 @@ export const AdminReportsView: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* Modal de Personalização de Cores e Logótipo do Salão */}
+      {isCustomizationOpen && (
+        <SalonCustomizationModal onClose={() => setIsCustomizationOpen(false)} />
+      )}
     </div>
   );
 };

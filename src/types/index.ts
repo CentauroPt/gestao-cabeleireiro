@@ -16,6 +16,8 @@ export interface Salon {
   status: SalonStatus; // 'ATIVO' | 'SUSPENSO' | 'CANCELADO'
   createdAt?: string;
   suspensionReason?: string;
+  logoUrl?: string; // Logótipo personalizado do salão
+  primaryColor?: string; // Cor principal personalizada do salão (Hex)
 }
 
 export interface User {
@@ -60,6 +62,7 @@ export interface Client {
   email?: string;
   preferredUserId?: string; // ID do profissional habitual
   technicalNotes?: string; // Ex: "Coloração 6.1 com oxidante 20vol; Alergia leve a amoníaco"
+  photoUrl?: string; // Foto do cliente (quadrada com esquinas arredondadas)
   createdById: string;
   createdAt: string;
   totalSpent: number; // Total acumulado gasto no salão

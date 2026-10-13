@@ -1,7 +1,18 @@
 import React, { useState } from 'react';
 import type { Client } from '../../types';
 import { useApp } from '../../context/AppContext';
-import { X, User, UserPlus, Phone, Mail, UserCheck, FileText } from 'lucide-react';
+import {
+  X,
+  User,
+  UserPlus,
+  Phone,
+  Mail,
+  UserCheck,
+  FileText,
+  Camera,
+  Upload,
+  Image as ImageIcon,
+} from 'lucide-react';
 
 interface Props {
   initialClient?: Client | null;
@@ -15,10 +26,35 @@ export const ClientFormModal: React.FC<Props> = ({ initialClient, onClose, onSuc
   const [name, setName] = useState(initialClient?.name || '');
   const [phone, setPhone] = useState(initialClient?.phone || '');
   const [email, setEmail] = useState(initialClient?.email || '');
+  const [photoUrl, setPhotoUrl] = useState(initialClient?.photoUrl || '');
   const [preferredUserId, setPreferredUserId] = useState(initialClient?.preferredUserId || '');
   const [technicalNotes, setTechnicalNotes] = useState(initialClient?.technicalNotes || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Por favor selecione um ficheiro de imagem válido (PNG, JPG, WebP).');
+      return;
+    }
+
+    if (file.size > 3 * 1024 * 1024) {
+      setError('A foto do cliente deve ter menos de 3MB.');
+      return;
+    }
+
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === 'string') {
+        setPhotoUrl(event.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +77,7 @@ export const ClientFormModal: React.FC<Props> = ({ initialClient, onClose, onSuc
         name: name.trim(),
         phone: phone.trim(),
         email: email.trim() || undefined,
+        photoUrl: photoUrl.trim() || undefined,
         preferredUserId: preferredUserId || undefined,
         technicalNotes: technicalNotes.trim() || undefined,
       });
@@ -49,6 +86,7 @@ export const ClientFormModal: React.FC<Props> = ({ initialClient, onClose, onSuc
         name: name.trim(),
         phone: phone.trim(),
         email: email.trim() || undefined,
+        photoUrl: photoUrl.trim() || undefined,
         preferredUserId: preferredUserId || undefined,
         technicalNotes: technicalNotes.trim() || undefined,
       });
@@ -88,6 +126,80 @@ export const ClientFormModal: React.FC<Props> = ({ initialClient, onClose, onSuc
               {error}
             </div>
           )}
+
+          {/* Foto do Cliente: Quadrada com esquinas arredondadas no topo esquerdo */}
+          <div className="flex items-start gap-3.5 p-3.5 bg-slate-50/70 border border-slate-200 rounded-2xl">
+            {/* Foto no topo esquerdo */}
+            <div className="relative shrink-0">
+              {photoUrl ? (
+                <div className="relative group">
+                  <img
+                    src={photoUrl}
+                    alt={name || 'Foto do Cliente'}
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-purple-300 shadow-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPhotoUrl('')}
+                    className="absolute -top-1.5 -right-1.5 bg-rose-600 hover:bg-rose-700 text-white p-1 rounded-full shadow-md cursor-pointer transition-colors"
+                    title="Remover foto"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-purple-50 border-2 border-dashed border-purple-200 flex flex-col items-center justify-center text-purple-400 gap-1 shadow-2xs">
+                  <Camera className="w-6 h-6" />
+                  <span className="text-[10px] font-bold">Sem Foto</span>
+                </div>
+              )}
+            </div>
+
+            {/* Ações e inputs de carregamento */}
+            <div className="flex-1 min-w-0 space-y-2">
+              <div>
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                  Foto do Cliente
+                </span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Foto quadrada com esquinas arredondadas que identifica o cliente na sua ficha técnica e janelas.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-2xs">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Carregar Imagem</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
+                {photoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setPhotoUrl('')}
+                    className="text-xs font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="url"
+                  value={photoUrl}
+                  onChange={(e) => setPhotoUrl(e.target.value)}
+                  placeholder="Ou cole o link URL da foto..."
+                  className="w-full text-xs pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none"
+                />
+                <ImageIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-2" />
+              </div>
+            </div>
+          </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Nome Completo *</label>

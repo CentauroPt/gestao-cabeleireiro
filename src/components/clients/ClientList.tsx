@@ -217,12 +217,27 @@ export const ClientList: React.FC<Props> = ({ onDirectBook }) => {
 
                   return (
                     <tr key={client.id} className="hover:bg-slate-50/80 transition-colors">
-                      {/* Nome e Telefone */}
+                      {/* Nome e Telefone com Foto Quadrada e Esquinas Arredondadas */}
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900">{client.name}</div>
-                        <div className="text-slate-500 flex items-center gap-1 mt-0.5">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          {client.phone}
+                        <div className="flex items-center gap-3">
+                          {client.photoUrl ? (
+                            <img
+                              src={client.photoUrl}
+                              alt={client.name}
+                              className="w-11 h-11 rounded-2xl object-cover border border-slate-200 shadow-2xs shrink-0"
+                            />
+                          ) : (
+                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-100 to-indigo-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold text-xs shrink-0 shadow-2xs">
+                              {client.name.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-bold text-slate-900">{client.name}</div>
+                            <div className="text-slate-500 flex items-center gap-1 mt-0.5">
+                              <Phone className="w-3 h-3 text-slate-400" />
+                              {client.phone}
+                            </div>
+                          </div>
                         </div>
                       </td>
 

@@ -12,6 +12,7 @@ export const mockSalons: Salon[] = [
     slotIntervalMinutes: 10,
     status: 'ATIVO',
     createdAt: '2026-08-10T10:00:00.000Z',
+    primaryColor: '#8B5CF6',
   },
   {
     id: 'salon-2',
@@ -24,6 +25,7 @@ export const mockSalons: Salon[] = [
     slotIntervalMinutes: 10,
     status: 'ATIVO',
     createdAt: '2026-09-01T14:30:00.000Z',
+    primaryColor: '#059669',
   },
   {
     id: 'salon-3',
@@ -37,6 +39,7 @@ export const mockSalons: Salon[] = [
     status: 'SUSPENSO',
     suspensionReason: 'Mensalidade pendente de regularização',
     createdAt: '2026-09-20T11:00:00.000Z',
+    primaryColor: '#D97706',
   },
 ];
 
@@ -179,6 +182,7 @@ export const mockClients: Client[] = [
     name: 'Maria João Pires',
     phone: '+351 919 111 222',
     email: 'maria.pires@gmail.com',
+    photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80',
     preferredUserId: 'user-colab-2', // Rita Ferreira
     technicalNotes: 'Fórmula de Cor: Majirel 7.1 (30g) + 7.31 (15g) com oxidante 20 vol. Cabelo fino, sensível a descoloração direta.',
     createdById: 'user-colab-2',
@@ -229,6 +233,7 @@ export const mockClients: Client[] = [
     name: 'Ana Beatriz Santos',
     phone: '+351 961 888 999',
     email: 'ana.santos@outlook.com',
+    photoUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
     preferredUserId: 'user-admin', // Helena Costa
     technicalNotes: 'Prefere corte com tesoura de dente largo. Usa sempre spray térmico protetor.',
     createdById: 'user-admin',
@@ -260,6 +265,7 @@ export const mockClients: Client[] = [
     name: 'Gonçalo Tavares',
     phone: '+351 933 777 444',
     email: 'goncalo.tavares@sapo.pt',
+    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
     preferredUserId: 'user-colab-1', // Tiago Silva
     technicalNotes: 'Fade número 1 nas laterais. Barba alinhada com toalha quente.',
     createdById: 'user-colab-1',
@@ -291,6 +297,7 @@ export const mockClients: Client[] = [
     name: 'Sofia Valente',
     phone: '+351 925 333 111',
     email: 'sofia.valente@hotmail.com',
+    photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
     preferredUserId: 'user-colab-2', // Rita Ferreira
     technicalNotes: 'Coloração alérgica a PPD! Usar apenas linha orgânica sem amoníaco. Raiz 5.0 pura.',
     createdById: 'user-admin',
@@ -330,6 +337,7 @@ export const mockClients: Client[] = [
     salonId: 'salon-1',
     name: 'Carla Mendonça',
     phone: '+351 918 444 222',
+    photoUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=300&q=80',
     preferredUserId: 'user-admin',
     technicalNotes: 'Cliente nova, prefere marcações ao final da tarde.',
     createdById: 'user-colab-1',

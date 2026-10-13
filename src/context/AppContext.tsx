@@ -98,6 +98,9 @@ interface AppContextType {
     closingTime?: string;
   }) => Promise<boolean>;
 
+  // Personalização do Salão (Admin Only - apenas o seu próprio salão)
+  updateSalonCustomization: (salonId: string, data: { logoUrl?: string; primaryColor?: string }) => Promise<boolean>;
+
   // Ações de Clientes
   addClient: (data: {
     name: string;
@@ -105,6 +108,7 @@ interface AppContextType {
     email?: string;
     preferredUserId?: string;
     technicalNotes?: string;
+    photoUrl?: string;
   }) => Promise<boolean>;
   updateClient: (id: string, data: Partial<Client>) => Promise<boolean>;
   deleteClient: (id: string) => Promise<boolean>;
@@ -647,6 +651,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // ================= PERSONALIZAÇÃO DO SALÃO (ADMIN ONLY) =================
+  const updateSalonCustomization = async (
+    salonId: string,
+    data: { logoUrl?: string; primaryColor?: string }
+  ): Promise<boolean> => {
+    if (!currentSalon || !currentUser) return false;
+    if (currentUser.role !== 'ADMIN') {
+      showNotification('error', 'Apenas o Administrador pode alterar as cores e o logótipo do salão.');
+      return false;
+    }
+    if (currentSalon.id !== salonId) {
+      showNotification('error', 'Apenas pode alterar a personalização do seu próprio salão.');
+      return false;
+    }
+
+    try {
+      await api.updateSalon(salonId, data);
+      await refreshData();
+      await refreshAllSalonsSummary();
+      showNotification('success', 'Personalização do salão (cores e logótipo) gravada com sucesso!');
+      return true;
+    } catch (err: any) {
+      showNotification('error', err.message || 'Erro ao gravar personalização do salão.');
+      return false;
+    }
+  };
+
   // ================= AÇÕES DE CLIENTES =================
   const addClient = async (data: {
     name: string;
@@ -654,6 +685,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     email?: string;
     preferredUserId?: string;
     technicalNotes?: string;
+    photoUrl?: string;
   }): Promise<boolean> => {
     if (!currentSalon || !currentUser) return false;
 
@@ -665,6 +697,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         email: data.email,
         preferredUserId: data.preferredUserId,
         technicalNotes: data.technicalNotes,
+        photoUrl: data.photoUrl,
         createdById: currentUser.id,
       });
       await refreshData();
@@ -860,6 +893,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteAppointment,
         completeAppointment,
         registerNewSalon,
+        updateSalonCustomization,
         addClient,
         updateClient,
         deleteClient,

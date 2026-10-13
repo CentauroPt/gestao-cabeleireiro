@@ -463,10 +463,19 @@ export const AppointmentModal: React.FC<Props> = ({
                             clientId === c.id ? 'bg-purple-50/80 font-bold text-purple-900' : 'text-slate-700'
                           }`}
                         >
-                          <span>
-                            <strong className="text-slate-900">{c.name}</strong> — {c.phone}
-                          </span>
-                          <span className="text-[11px] font-semibold text-purple-600">Selecionar</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            {c.photoUrl ? (
+                              <img src={c.photoUrl} alt={c.name} className="w-7 h-7 rounded-lg object-cover shrink-0" />
+                            ) : (
+                              <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                {c.name.slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <span className="truncate">
+                              <strong className="text-slate-900">{c.name}</strong> — {c.phone}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-semibold text-purple-600 shrink-0 ml-2">Selecionar</span>
                         </button>
                       ))
                     )}
@@ -510,6 +519,32 @@ export const AppointmentModal: React.FC<Props> = ({
                 </button>
               )}
             </div>
+
+            {/* Ficha Visual Resumida do Cliente com Foto Quadrada e Esquinas Arredondadas */}
+            {selectedClient && (
+              <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {selectedClient.photoUrl ? (
+                    <img
+                      src={selectedClient.photoUrl}
+                      alt={selectedClient.name}
+                      className="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-purple-100 border border-purple-200 text-purple-700 font-bold flex items-center justify-center text-xs shrink-0">
+                      {selectedClient.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900 truncate">{selectedClient.name}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{selectedClient.phone}</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-purple-700 bg-purple-100/70 px-2 py-0.5 rounded-full shrink-0">
+                  {selectedClient.visitHistory.length} visitas
+                </span>
+              </div>
+            )}
 
             {isAddingNewClient && !isEditing && (
               <ClientFormModal
