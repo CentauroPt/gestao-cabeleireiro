@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Client } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { compressImage } from '../../utils/imageCompressor';
 import {
   X,
   User,
@@ -32,7 +33,7 @@ export const ClientFormModal: React.FC<Props> = ({ initialClient, onClose, onSuc
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -41,19 +42,13 @@ export const ClientFormModal: React.FC<Props> = ({ initialClient, onClose, onSuc
       return;
     }
 
-    if (file.size > 3 * 1024 * 1024) {
-      setError('A foto do cliente deve ter menos de 3MB.');
-      return;
+    try {
+      setError(null);
+      const compressed = await compressImage(file, 280, 0.78);
+      setPhotoUrl(compressed);
+    } catch {
+      setError('Não foi possível processar a imagem selecionada.');
     }
-
-    setError(null);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (typeof event.target?.result === 'string') {
-        setPhotoUrl(event.target.result);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

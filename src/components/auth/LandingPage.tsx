@@ -50,17 +50,22 @@ export const LandingPage: React.FC = () => {
   // Submissão do Registo de Novo Salão
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regSalonName || !regPhone || !regAdminName || !regAdminEmail) return;
+    const cleanEmail = regAdminEmail.trim().toLowerCase();
+    const cleanSalonName = regSalonName.trim();
+    const cleanAdminName = regAdminName.trim();
+    const cleanPhone = regPhone.trim();
+
+    if (!cleanSalonName || !cleanPhone || !cleanAdminName || !cleanEmail) return;
 
     setIsRegistering(true);
     await registerNewSalon({
-      name: regSalonName,
-      phone: regPhone,
-      address: regAddress || 'Morada não indicada',
-      nif: regNif,
-      adminName: regAdminName,
-      adminEmail: regAdminEmail,
-      adminPassword: regAdminPassword || 'admin123',
+      name: cleanSalonName,
+      phone: cleanPhone,
+      address: regAddress.trim() || 'Morada não indicada',
+      nif: regNif.trim(),
+      adminName: cleanAdminName,
+      adminEmail: cleanEmail,
+      adminPassword: regAdminPassword.trim() || 'admin123',
       openingTime: regOpeningTime,
       closingTime: regClosingTime,
     });
@@ -71,10 +76,11 @@ export const LandingPage: React.FC = () => {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    if (!loginEmail) return;
+    const cleanEmail = loginEmail.trim().toLowerCase();
+    if (!cleanEmail) return;
 
     setIsLoggingIn(true);
-    const res = await loginSalonUser(loginEmail, loginPassword);
+    const res = await loginSalonUser(cleanEmail, loginPassword.trim());
     setIsLoggingIn(false);
     if (!res.success && res.error) {
       setLoginError(res.error);

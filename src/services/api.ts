@@ -1,33 +1,11 @@
 import type { Salon, SalonStatus, User, Service, Client, Appointment } from '../types';
 import { mockSalons, mockUsers, mockServices, mockClients, mockAppointments } from '../data/mockData';
-
-const STORAGE_KEYS = {
-  SALONS: 'salao_app_salons',
-  USERS: 'salao_app_users',
-  SERVICES: 'salao_app_services',
-  CLIENTS: 'salao_app_clients',
-  APPOINTMENTS: 'salao_app_appointments',
-  DEV_PASSWORD: 'salao_app_dev_password',
-};
-
-// Carrega do LocalStorage ou usa os dados mock iniciais
-function loadInitial<T>(key: string, fallback: T[]): T[] {
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved);
-  } catch (e) {
-    console.error(`Erro ao ler ${key} da cache:`, e);
-  }
-  return fallback;
-}
-
-function saveToStorage<T>(key: string, data: T[]): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.error(`Erro ao guardar ${key}:`, e);
-  }
-}
+import {
+  STORAGE_KEYS,
+  loadFromLocalStorage,
+  saveToStorage,
+  syncFromIndexedDBIfEmpty,
+} from './storageEngine';
 
 export interface SalonSummary {
   salon: Salon;
@@ -39,29 +17,56 @@ export interface SalonSummary {
 }
 
 export class ApiService {
-  private salons: Salon[] = loadInitial(STORAGE_KEYS.SALONS, mockSalons).map((s) => {
-    const mockMatch = mockSalons.find((m) => m.id === s.id);
-    return {
-      ...s,
-      status: s.status || 'ATIVO',
-      primaryColor: s.primaryColor || mockMatch?.primaryColor || '#8B5CF6',
-      logoUrl: s.logoUrl || mockMatch?.logoUrl,
-      createdAt: s.createdAt || mockMatch?.createdAt || new Date().toISOString(),
-    };
-  });
-  private users: User[] = loadInitial(STORAGE_KEYS.USERS, mockUsers);
-  private services: Service[] = loadInitial(STORAGE_KEYS.SERVICES, mockServices);
-  private clients: Client[] = loadInitial(STORAGE_KEYS.CLIENTS, mockClients).map((c) => {
-    const mockMatch = mockClients.find((m) => m.id === c.id);
-    return {
-      ...c,
-      photoUrl: c.photoUrl || mockMatch?.photoUrl,
-    };
-  });
-  private appointments: Appointment[] = loadInitial(STORAGE_KEYS.APPOINTMENTS, mockAppointments);
+  private salons: Salon[] = [];
+  private users: User[] = [];
+  private services: Service[] = [];
+  private clients: Client[] = [];
+  private appointments: Appointment[] = [];
 
   // URL base configurável para o backend no servidor do utilizador
-  private baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+  private baseUrl = import.meta.env?.VITE_API_BASE_URL || '';
+
+  constructor() {
+    this.reloadFromStorage();
+    // Inicia sincronização de segurança a partir do IndexedDB em segundo plano
+    if (typeof window !== 'undefined') {
+      syncFromIndexedDBIfEmpty().then((synced) => {
+        if (synced) {
+          this.reloadFromStorage();
+        }
+      });
+    }
+  }
+
+  /**
+   * Recarrega todos os dados a partir do armazenamento persistente
+   * para assegurar que múltiplas abas ou sessões nunca usem cache desatualizada.
+   */
+  public reloadFromStorage(): void {
+    this.salons = loadFromLocalStorage(STORAGE_KEYS.SALONS, mockSalons).map((s) => {
+      const mockMatch = mockSalons.find((m) => m.id === s.id);
+      return {
+        ...s,
+        status: s.status || 'ATIVO',
+        primaryColor: s.primaryColor || mockMatch?.primaryColor || '#8B5CF6',
+        logoUrl: s.logoUrl || mockMatch?.logoUrl,
+        createdAt: s.createdAt || mockMatch?.createdAt || new Date().toISOString(),
+      };
+    });
+
+    this.users = loadFromLocalStorage(STORAGE_KEYS.USERS, mockUsers);
+    this.services = loadFromLocalStorage(STORAGE_KEYS.SERVICES, mockServices);
+
+    this.clients = loadFromLocalStorage(STORAGE_KEYS.CLIENTS, mockClients).map((c) => {
+      const mockMatch = mockClients.find((m) => m.id === c.id);
+      return {
+        ...c,
+        photoUrl: c.photoUrl || mockMatch?.photoUrl,
+      };
+    });
+
+    this.appointments = loadFromLocalStorage(STORAGE_KEYS.APPOINTMENTS, mockAppointments);
+  }
 
   getBaseUrl(): string {
     return this.baseUrl;
@@ -69,14 +74,17 @@ export class ApiService {
 
   // ================= SALÕES =================
   async getSalons(): Promise<Salon[]> {
+    this.reloadFromStorage();
     return [...this.salons];
   }
 
   async getSalonById(id: string): Promise<Salon | null> {
+    this.reloadFromStorage();
     return this.salons.find((s) => s.id === id) || null;
   }
 
   async createSalon(salonData: Omit<Salon, 'id'>): Promise<Salon> {
+    this.reloadFromStorage();
     const newSalon: Salon = {
       id: `salon-${Date.now()}`,
       ...salonData,
@@ -89,6 +97,7 @@ export class ApiService {
   }
 
   async updateSalon(salonId: string, updates: Partial<Salon>): Promise<Salon> {
+    this.reloadFromStorage();
     const idx = this.salons.findIndex((s) => s.id === salonId);
     if (idx === -1) throw new Error('Salão não encontrado.');
     this.salons[idx] = { ...this.salons[idx], ...updates };
@@ -107,18 +116,34 @@ export class ApiService {
     openingTime?: string;
     closingTime?: string;
   }): Promise<{ salon: Salon; adminUser: User }> {
+    this.reloadFromStorage();
+
+    const cleanEmail = params.adminEmail.trim().toLowerCase();
+    const cleanSalonName = params.name.trim();
+
+    // Validação preventiva: verificar se já existe utilizador com o mesmo e-mail
+    const existingUser = this.users.find(
+      (u) => (u.email || '').trim().toLowerCase() === cleanEmail
+    );
+    if (existingUser) {
+      throw new Error(
+        `Já existe uma conta registada com o e-mail "${cleanEmail}". Pode iniciar sessão diretamente com este e-mail.`
+      );
+    }
+
     const salonId = `salon-${Date.now()}`;
     const newSalon: Salon = {
       id: salonId,
-      name: params.name,
-      phone: params.phone,
-      address: params.address,
-      nif: params.nif || '',
+      name: cleanSalonName,
+      phone: params.phone.trim(),
+      address: params.address.trim(),
+      nif: params.nif?.trim() || '',
       openingTime: params.openingTime || '09:00',
       closingTime: params.closingTime || '20:00',
       slotIntervalMinutes: 10,
       status: 'ATIVO',
       createdAt: new Date().toISOString(),
+      primaryColor: '#8B5CF6',
     };
     this.salons.push(newSalon);
     saveToStorage(STORAGE_KEYS.SALONS, this.salons);
@@ -127,11 +152,11 @@ export class ApiService {
     const adminUser: User = {
       id: `user-${Date.now()}`,
       salonId,
-      name: params.adminName,
-      email: params.adminEmail,
-      phone: params.phone,
+      name: params.adminName.trim(),
+      email: cleanEmail,
+      phone: params.phone.trim(),
       role: 'ADMIN',
-      password: params.adminPassword || 'admin123',
+      password: (params.adminPassword || 'admin123').trim(),
       color: '#8B5CF6',
       specialties: ['Gestão', 'Cortes & Estilo'],
       active: true,
@@ -175,6 +200,7 @@ export class ApiService {
 
   // Suspender ou Cancelar Salão (Função Exclusiva do Programador)
   async updateSalonStatus(salonId: string, status: SalonStatus, reason?: string): Promise<Salon> {
+    this.reloadFromStorage();
     const idx = this.salons.findIndex((s) => s.id === salonId);
     if (idx === -1) throw new Error('Salão não encontrado.');
 
@@ -189,6 +215,7 @@ export class ApiService {
 
   // Eliminar Salão e dados associados (Função Exclusiva do Programador)
   async deleteSalon(salonId: string): Promise<void> {
+    this.reloadFromStorage();
     this.salons = this.salons.filter((s) => s.id !== salonId);
     this.users = this.users.filter((u) => u.salonId !== salonId);
     this.services = this.services.filter((s) => s.salonId !== salonId);
@@ -222,6 +249,7 @@ export class ApiService {
 
   // Alterar a Palavra-passe de um Salão Registado (Função do Programador)
   async updateSalonAdminPassword(salonId: string, newPassword: string): Promise<void> {
+    this.reloadFromStorage();
     if (!newPassword || newPassword.trim().length < 3) {
       throw new Error('A palavra-passe deve ter pelo menos 3 caracteres.');
     }
@@ -231,7 +259,6 @@ export class ApiService {
       throw new Error('Não foram encontrados utilizadores registados neste salão.');
     }
 
-    // Atualiza a palavra-passe do(s) administrador(es) do salão
     const admins = salonUsers.filter((u) => u.role === 'ADMIN');
     if (admins.length > 0) {
       admins.forEach((adm) => {
@@ -246,13 +273,13 @@ export class ApiService {
 
   // Resumo de todos os salões para a Consola do Programador
   async getAllSalonsSummary(): Promise<SalonSummary[]> {
+    this.reloadFromStorage();
     return this.salons.map((salon) => {
       const salonUsers = this.users.filter((u) => u.salonId === salon.id);
       const salonClients = this.clients.filter((c) => c.salonId === salon.id);
       const salonAppointments = this.appointments.filter((a) => a.salonId === salon.id);
       const adminUser = salonUsers.find((u) => u.role === 'ADMIN');
 
-      // Calcular receita total do salão
       const revenueFromClients = salonClients.reduce((acc, c) => acc + (c.totalSpent || 0), 0);
 
       return {
@@ -268,12 +295,38 @@ export class ApiService {
 
   // Autenticação de Utilizador / Salão
   async loginUser(email: string, password?: string): Promise<{ user: User; salon: Salon }> {
-    const user = this.users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+    this.reloadFromStorage();
+    const cleanEmail = email.trim().toLowerCase();
+
+    let user = this.users.find(
+      (u) => (u.email || '').trim().toLowerCase() === cleanEmail
+    );
+
+    // Se não encontrou, tenta sincronizar do IndexedDB e re-verificar
     if (!user) {
-      throw new Error('Não existe nenhum utilizador registado com este e-mail.');
+      const synced = await syncFromIndexedDBIfEmpty();
+      if (synced) {
+        this.reloadFromStorage();
+        user = this.users.find(
+          (u) => (u.email || '').trim().toLowerCase() === cleanEmail
+        );
+      }
     }
 
-    if (password && user.password && user.password !== password && password !== 'admin123' && password !== 'admin') {
+    if (!user) {
+      throw new Error(`Não existe nenhum utilizador registado com o e-mail: ${cleanEmail}`);
+    }
+
+    const inputPassword = (password || '').trim();
+    const userPassword = (user.password || '').trim();
+
+    if (
+      inputPassword &&
+      userPassword &&
+      userPassword !== inputPassword &&
+      inputPassword !== 'admin123' &&
+      inputPassword !== 'admin'
+    ) {
       throw new Error('Palavra-passe incorreta.');
     }
 
@@ -299,16 +352,19 @@ export class ApiService {
 
   // ================= UTILIZADORES / COLABORADORES =================
   async getUsers(salonId: string): Promise<User[]> {
+    this.reloadFromStorage();
     return this.users.filter((u) => u.salonId === salonId);
   }
 
   async createUser(currentUserRole: string, userData: Omit<User, 'id'>): Promise<User> {
+    this.reloadFromStorage();
     if (currentUserRole !== 'ADMIN') {
       throw new Error('Apenas o Administrador pode registar novos colaboradores.');
     }
     const newUser: User = {
       id: `user-${Date.now()}`,
       ...userData,
+      email: userData.email ? userData.email.trim().toLowerCase() : userData.email,
     };
     this.users.push(newUser);
     saveToStorage(STORAGE_KEYS.USERS, this.users);
@@ -316,17 +372,23 @@ export class ApiService {
   }
 
   async updateUser(currentUserRole: string, id: string, data: Partial<User>): Promise<User> {
+    this.reloadFromStorage();
     if (currentUserRole !== 'ADMIN') {
       throw new Error('Apenas o Administrador pode alterar os dados dos colaboradores.');
     }
     const index = this.users.findIndex((u) => u.id === id);
     if (index === -1) throw new Error('Colaborador não encontrado.');
-    this.users[index] = { ...this.users[index], ...data };
+    this.users[index] = {
+      ...this.users[index],
+      ...data,
+      email: data.email ? data.email.trim().toLowerCase() : this.users[index].email,
+    };
     saveToStorage(STORAGE_KEYS.USERS, this.users);
     return this.users[index];
   }
 
   async deleteUser(currentUserRole: string, id: string): Promise<void> {
+    this.reloadFromStorage();
     if (currentUserRole !== 'ADMIN') {
       throw new Error('Apenas o Administrador pode desativar colaboradores.');
     }
@@ -336,10 +398,12 @@ export class ApiService {
 
   // ================= SERVIÇOS =================
   async getServices(salonId: string): Promise<Service[]> {
+    this.reloadFromStorage();
     return this.services.filter((s) => s.salonId === salonId);
   }
 
   async createService(_currentUserRole: string, serviceData: Omit<Service, 'id'>): Promise<Service> {
+    this.reloadFromStorage();
     const newService: Service = {
       id: `serv-${Date.now()}`,
       ...serviceData,
@@ -350,6 +414,7 @@ export class ApiService {
   }
 
   async updateService(_currentUserRole: string, id: string, data: Partial<Service>): Promise<Service> {
+    this.reloadFromStorage();
     const index = this.services.findIndex((s) => s.id === id);
     if (index === -1) throw new Error('Serviço não encontrado.');
     this.services[index] = { ...this.services[index], ...data };
@@ -358,6 +423,7 @@ export class ApiService {
   }
 
   async deleteService(currentUserRole: string, id: string): Promise<void> {
+    this.reloadFromStorage();
     if (currentUserRole !== 'ADMIN') {
       throw new Error('Apenas o Administrador pode eliminar serviços do catálogo.');
     }
@@ -367,13 +433,18 @@ export class ApiService {
 
   // ================= CLIENTES =================
   async getClients(salonId: string): Promise<Client[]> {
+    this.reloadFromStorage();
     return this.clients.filter((c) => c.salonId === salonId);
   }
 
   async createClient(clientData: Omit<Client, 'id' | 'createdAt' | 'totalSpent' | 'visitHistory'>): Promise<Client> {
+    this.reloadFromStorage();
     const newClient: Client = {
       id: `client-${Date.now()}`,
       ...clientData,
+      name: clientData.name.trim(),
+      phone: clientData.phone.trim(),
+      email: clientData.email ? clientData.email.trim().toLowerCase() : undefined,
       createdAt: new Date().toISOString(),
       totalSpent: 0,
       visitHistory: [],
@@ -384,14 +455,22 @@ export class ApiService {
   }
 
   async updateClient(id: string, data: Partial<Client>): Promise<Client> {
+    this.reloadFromStorage();
     const index = this.clients.findIndex((c) => c.id === id);
     if (index === -1) throw new Error('Cliente não encontrado.');
-    this.clients[index] = { ...this.clients[index], ...data };
+    this.clients[index] = {
+      ...this.clients[index],
+      ...data,
+      name: data.name !== undefined ? data.name.trim() : this.clients[index].name,
+      phone: data.phone !== undefined ? data.phone.trim() : this.clients[index].phone,
+      email: data.email !== undefined ? (data.email ? data.email.trim().toLowerCase() : undefined) : this.clients[index].email,
+    };
     saveToStorage(STORAGE_KEYS.CLIENTS, this.clients);
     return this.clients[index];
   }
 
   async deleteClient(currentUserRole: string, id: string): Promise<void> {
+    this.reloadFromStorage();
     if (currentUserRole !== 'ADMIN') {
       throw new Error('Apenas o Administrador pode apagar fichas de clientes.');
     }
@@ -401,10 +480,12 @@ export class ApiService {
 
   // ================= RESERVAS / AGENDAMENTO =================
   async getAppointments(salonId: string): Promise<Appointment[]> {
+    this.reloadFromStorage();
     return this.appointments.filter((a) => a.salonId === salonId);
   }
 
   async createAppointment(appointmentData: Omit<Appointment, 'id' | 'createdAt'>): Promise<Appointment> {
+    this.reloadFromStorage();
     const newAppointment: Appointment = {
       id: `apt-${Date.now()}`,
       ...appointmentData,
@@ -416,10 +497,10 @@ export class ApiService {
   }
 
   async updateAppointment(currentUserRole: string, id: string, data: Partial<Appointment>): Promise<Appointment> {
+    this.reloadFromStorage();
     const index = this.appointments.findIndex((a) => a.id === id);
     if (index === -1) throw new Error('Reserva não encontrada.');
 
-    // Se estiver a tentar cancelar/apagar
     if (data.status === 'CANCELADA' && currentUserRole !== 'ADMIN') {
       throw new Error('Apenas o Administrador tem permissão para cancelar ou apagar reservas.');
     }
@@ -430,6 +511,7 @@ export class ApiService {
   }
 
   async deleteAppointment(currentUserRole: string, id: string): Promise<void> {
+    this.reloadFromStorage();
     if (currentUserRole !== 'ADMIN') {
       throw new Error('Acesso negado: Apenas o Administrador de cada cabeleireiro poderá apagar reservas.');
     }
@@ -439,13 +521,13 @@ export class ApiService {
 
   // Concluir serviço e lançar automaticamente no histórico do cliente
   async completeAppointment(_currentUserRole: string, appointmentId: string, professionalName: string): Promise<void> {
+    this.reloadFromStorage();
     const apt = this.appointments.find((a) => a.id === appointmentId);
     if (!apt) throw new Error('Reserva não encontrada.');
 
     apt.status = 'CONCLUIDA';
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
 
-    // Atualiza histórico do cliente
     const client = this.clients.find((c) => c.id === apt.clientId);
     if (client) {
       const nowIso = new Date().toISOString();
@@ -477,6 +559,11 @@ export class ApiService {
     this.services = [...mockServices];
     this.clients = [...mockClients];
     this.appointments = [...mockAppointments];
+    saveToStorage(STORAGE_KEYS.SALONS, this.salons);
+    saveToStorage(STORAGE_KEYS.USERS, this.users);
+    saveToStorage(STORAGE_KEYS.SERVICES, this.services);
+    saveToStorage(STORAGE_KEYS.CLIENTS, this.clients);
+    saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
   }
 }
 

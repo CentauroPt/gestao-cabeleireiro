@@ -2,6 +2,11 @@ import React, { createContext, useContext, useState, useEffect, useMemo } from '
 import type { Salon, SalonStatus, User, Service, Client, Appointment, TabType } from '../types';
 import { api, type SalonSummary } from '../services/api';
 import {
+  saveActiveSession,
+  loadActiveSession,
+  clearActiveSession,
+} from '../services/storageEngine';
+import {
   calculateEndTime,
   calculateDurationMinutes,
   addMinutesToTime,
@@ -131,22 +136,39 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Carregar sessão persistida se existir
+  const initialSession = loadActiveSession();
+
   // Navegação Global da Aplicação
-  const [appMode, setAppMode] = useState<AppMode>('landing');
+  const [appMode, setAppMode] = useState<AppMode>(initialSession?.appMode || 'landing');
   const [activeTab, setActiveTab] = useState<TabType>('calendar');
-  const [isDevLoggedIn, setIsDevLoggedIn] = useState<boolean>(false);
+  const [isDevLoggedIn, setIsDevLoggedIn] = useState<boolean>(initialSession?.appMode === 'developer');
   const [isImpersonating, setIsImpersonating] = useState<boolean>(false);
   const [allSalonsSummary, setAllSalonsSummary] = useState<SalonSummary[]>([]);
 
   const [salons, setSalons] = useState<Salon[]>([]);
-  const [currentSalonId, setCurrentSalonId] = useState<string>('salon-1');
+  const [currentSalonId, setCurrentSalonIdState] = useState<string>(initialSession?.salonId || 'salon-1');
   const [users, setUsers] = useState<User[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string>('user-admin'); // Começa como Admin por defeito
+  const [currentUserId, setCurrentUserIdState] = useState<string>(initialSession?.userId || 'user-admin');
   const [services, setServices] = useState<Service[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  const setCurrentSalonId = (id: string) => {
+    setCurrentSalonIdState(id);
+    if (appMode === 'salon') {
+      saveActiveSession({ appMode: 'salon', salonId: id, userId: currentUserId });
+    }
+  };
+
+  const setCurrentUserId = (id: string) => {
+    setCurrentUserIdState(id);
+    if (appMode === 'salon') {
+      saveActiveSession({ appMode: 'salon', salonId: currentSalonId, userId: id });
+    }
+  };
 
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
     setNotification({ type, message });
@@ -510,11 +532,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loginSalonUser = async (email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const { user, salon } = await api.loginUser(email, password);
-      setCurrentSalonId(salon.id);
-      setCurrentUserId(user.id);
-      await refreshData();
+      setCurrentSalonIdState(salon.id);
+      setCurrentUserIdState(user.id);
       setIsImpersonating(false);
       setAppMode('salon');
+      saveActiveSession({ appMode: 'salon', salonId: salon.id, userId: user.id });
+      await refreshData();
       showNotification('success', `Sessão iniciada no salão "${salon.name}".`);
       return { success: true };
     } catch (err: any) {
@@ -526,8 +549,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logoutCurrentSalon = () => {
     setIsAdminUnlocked(false);
     setIsImpersonating(false);
+    clearActiveSession();
     setAppMode('landing');
-    showNotification('info', 'Sessão encerrada.');
+    showNotification('info', 'Sessão encerrada com sucesso.');
   };
 
   // Controlo do Programador (Super Admin)
@@ -544,6 +568,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ) {
       setIsDevLoggedIn(true);
       setAppMode('developer');
+      saveActiveSession({ appMode: 'developer', salonId: currentSalonId, userId: currentUserId });
       refreshAllSalonsSummary();
       showNotification('success', 'Acesso à Consola do Programador autorizado!');
       return true;
@@ -580,6 +605,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logoutDeveloper = () => {
     setIsDevLoggedIn(false);
     setIsImpersonating(false);
+    clearActiveSession();
     setAppMode('landing');
     showNotification('info', 'Sessão de programador terminada.');
   };
@@ -638,11 +664,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }): Promise<boolean> => {
     try {
       const { salon, adminUser } = await api.registerSalon(params);
-      setCurrentSalonId(salon.id);
-      setCurrentUserId(adminUser.id);
+      setCurrentSalonIdState(salon.id);
+      setCurrentUserIdState(adminUser.id);
+      setAppMode('salon');
+      saveActiveSession({ appMode: 'salon', salonId: salon.id, userId: adminUser.id });
       await refreshData();
       await refreshAllSalonsSummary();
-      setAppMode('salon');
       showNotification('success', `Salão "${salon.name}" registado com sucesso!`);
       return true;
     } catch (err: any) {

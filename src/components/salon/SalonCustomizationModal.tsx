@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { compressImage } from '../../utils/imageCompressor';
 import {
   X,
   Upload,
@@ -40,7 +41,7 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -49,19 +50,13 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
       return;
     }
 
-    if (file.size > 2.5 * 1024 * 1024) {
-      setError('A imagem do logótipo deve ter um tamanho inferior a 2.5MB.');
-      return;
+    try {
+      setError(null);
+      const compressed = await compressImage(file, 260, 0.8);
+      setLogoUrl(compressed);
+    } catch {
+      setError('Não foi possível processar a imagem do logótipo.');
     }
-
-    setError(null);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (typeof event.target?.result === 'string') {
-        setLogoUrl(event.target.result);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleSave = async (e: React.FormEvent) => {
