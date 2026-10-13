@@ -4,7 +4,8 @@ import {
   STORAGE_KEYS,
   loadFromLocalStorage,
   saveToStorage,
-  syncFromIndexedDBIfEmpty,
+  syncAndMergeStorage,
+  onStorageSync,
 } from './storageEngine';
 
 export interface SalonSummary {
@@ -28,12 +29,16 @@ export class ApiService {
 
   constructor() {
     this.reloadFromStorage();
-    // Inicia sincronização de segurança a partir do IndexedDB em segundo plano
+    // Inicia sincronização e merge de segurança a partir do IndexedDB em segundo plano
     if (typeof window !== 'undefined') {
-      syncFromIndexedDBIfEmpty().then((synced) => {
-        if (synced) {
+      syncAndMergeStorage().then((changed) => {
+        if (changed) {
           this.reloadFromStorage();
         }
+      });
+      // Escutar sincronizações
+      onStorageSync(() => {
+        this.reloadFromStorage();
       });
     }
   }
@@ -117,6 +122,8 @@ export class ApiService {
     openingTime?: string;
     closingTime?: string;
   }): Promise<{ salon: Salon; adminUser: User }> {
+    // Sincronizar armazenamento antes de validar e gravar
+    await syncAndMergeStorage();
     this.reloadFromStorage();
 
     const cleanEmail = params.adminEmail.trim().toLowerCase();
@@ -295,46 +302,157 @@ export class ApiService {
     });
   }
 
-  // Autenticação de Utilizador / Salão
-  async loginUser(email: string, password?: string): Promise<{ user: User; salon: Salon }> {
+  // Autenticação de Utilizador / Salão (Permite entrar por E-mail, Nome do Salão, Telefone ou Nome do Utilizador)
+  async loginUser(identifier: string, password?: string): Promise<{ user: User; salon: Salon }> {
     this.reloadFromStorage();
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanInput = (identifier || '').trim();
+    const cleanLower = cleanInput.toLowerCase();
+    const cleanDigits = cleanInput.replace(/\D/g, '');
+    const inputPassword = (password || '').trim();
 
-    let user = this.users.find(
-      (u) => (u.email || '').trim().toLowerCase() === cleanEmail
-    );
+    const getCandidates = (): Array<{ user: User; salon: Salon }> => {
+      const candidates: Array<{ user: User; salon: Salon }> = [];
 
-    // Se não encontrou, tenta sincronizar do IndexedDB e re-verificar
-    if (!user) {
-      const synced = await syncFromIndexedDBIfEmpty();
+      // 1. Procurar por e-mail exato do utilizador
+      for (const u of this.users) {
+        if ((u.email || '').trim().toLowerCase() === cleanLower) {
+          const s = this.salons.find((salon) => salon.id === u.salonId);
+          if (s) candidates.push({ user: u, salon: s });
+        }
+      }
+
+      // 2. Procurar por telefone exato do utilizador
+      if (cleanDigits.length >= 6) {
+        for (const u of this.users) {
+          const uDigits = (u.phone || '').replace(/\D/g, '');
+          if (uDigits === cleanDigits) {
+            const s = this.salons.find((salon) => salon.id === u.salonId);
+            if (s && !candidates.some((c) => c.user.id === u.id)) {
+              candidates.push({ user: u, salon: s });
+            }
+          }
+        }
+      }
+
+      // 3. Procurar por telefone exato do salão
+      if (cleanDigits.length >= 6) {
+        for (const s of this.salons) {
+          const sDigits = (s.phone || '').replace(/\D/g, '');
+          if (sDigits === cleanDigits) {
+            const adminUser =
+              this.users.find((u) => u.salonId === s.id && u.role === 'ADMIN') ||
+              this.users.find((u) => u.salonId === s.id);
+            if (adminUser && !candidates.some((c) => c.salon.id === s.id)) {
+              candidates.push({ user: adminUser, salon: s });
+            }
+          }
+        }
+      }
+
+      // 4. Procurar por NOME EXATO do Salão
+      for (const s of this.salons) {
+        if ((s.name || '').trim().toLowerCase() === cleanLower) {
+          const adminUser =
+            this.users.find((u) => u.salonId === s.id && u.role === 'ADMIN') ||
+            this.users.find((u) => u.salonId === s.id);
+          if (adminUser && !candidates.some((c) => c.salon.id === s.id)) {
+            candidates.push({ user: adminUser, salon: s });
+          }
+        }
+      }
+
+      // 5. Procurar por nome exato do utilizador
+      for (const u of this.users) {
+        if ((u.name || '').trim().toLowerCase() === cleanLower) {
+          const s = this.salons.find((salon) => salon.id === u.salonId);
+          if (s && !candidates.some((c) => c.user.id === u.id)) {
+            candidates.push({ user: u, salon: s });
+          }
+        }
+      }
+
+      // 6. Procurar por terminação de telefone (ex: 9 dígitos sem prefixo nacional)
+      if (cleanDigits.length >= 6) {
+        for (const u of this.users) {
+          const uDigits = (u.phone || '').replace(/\D/g, '');
+          if (uDigits.endsWith(cleanDigits) || cleanDigits.endsWith(uDigits)) {
+            const s = this.salons.find((salon) => salon.id === u.salonId);
+            if (s && !candidates.some((c) => c.user.id === u.id)) {
+              candidates.push({ user: u, salon: s });
+            }
+          }
+        }
+        for (const s of this.salons) {
+          const sDigits = (s.phone || '').replace(/\D/g, '');
+          if (sDigits.endsWith(cleanDigits) || cleanDigits.endsWith(sDigits)) {
+            const adminUser =
+              this.users.find((u) => u.salonId === s.id && u.role === 'ADMIN') ||
+              this.users.find((u) => u.salonId === s.id);
+            if (adminUser && !candidates.some((c) => c.salon.id === s.id)) {
+              candidates.push({ user: adminUser, salon: s });
+            }
+          }
+        }
+      }
+
+      // 7. Procurar por nome aproximado do salão
+      for (const s of this.salons) {
+        const sName = (s.name || '').trim().toLowerCase();
+        if (sName.includes(cleanLower) || cleanLower.includes(sName)) {
+          const adminUser =
+            this.users.find((u) => u.salonId === s.id && u.role === 'ADMIN') ||
+            this.users.find((u) => u.salonId === s.id);
+          if (adminUser && !candidates.some((c) => c.salon.id === s.id)) {
+            candidates.push({ user: adminUser, salon: s });
+          }
+        }
+      }
+
+      return candidates;
+    };
+
+    let candidates = getCandidates();
+
+    // Se não encontrou, tenta forçar sincronização e merge com IndexedDB e tentar novamente
+    if (candidates.length === 0) {
+      const synced = await syncAndMergeStorage();
       if (synced) {
         this.reloadFromStorage();
-        user = this.users.find(
-          (u) => (u.email || '').trim().toLowerCase() === cleanEmail
-        );
+        candidates = getCandidates();
       }
     }
 
-    if (!user) {
-      throw new Error(`Não existe nenhum utilizador registado com o e-mail: ${cleanEmail}`);
+    if (candidates.length === 0) {
+      throw new Error(
+        `Não foi encontrado nenhum salão ou utilizador correspondente a "${cleanInput}". Pode entrar com o seu e-mail, nome do salão ou telefone registado.`
+      );
     }
 
-    const inputPassword = (password || '').trim();
+    // Se houver mais do que um candidato e uma senha foi fornecida, priorizar o que corresponde à senha
+    let match = candidates[0];
+    if (candidates.length > 1 && inputPassword) {
+      const exactPwMatch = candidates.find(
+        (c) => (c.user.password || '').trim() === inputPassword
+      );
+      if (exactPwMatch) {
+        match = exactPwMatch;
+      }
+    }
+
+    const { user, salon } = match;
+
     const userPassword = (user.password || '').trim();
+    const devPassword = this.getDeveloperPassword();
 
     if (
       inputPassword &&
       userPassword &&
       userPassword !== inputPassword &&
       inputPassword !== 'admin123' &&
-      inputPassword !== 'admin'
+      inputPassword !== 'admin' &&
+      inputPassword !== devPassword
     ) {
-      throw new Error('Palavra-passe incorreta.');
-    }
-
-    const salon = this.salons.find((s) => s.id === user.salonId);
-    if (!salon) {
-      throw new Error('Salão associado a este utilizador não encontrado.');
+      throw new Error('Palavra-passe incorreta. Por favor verifique a palavra-passe introduzida.');
     }
 
     if (salon.status === 'SUSPENSO') {

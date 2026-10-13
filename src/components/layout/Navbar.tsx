@@ -4,7 +4,6 @@ import {
   Scissors,
   Shield,
   User as UserIcon,
-  RefreshCw,
   CheckCircle2,
   AlertTriangle,
   Info,
@@ -23,7 +22,6 @@ export const Navbar: React.FC = () => {
     setCurrentUserId,
     notification,
     setNotification,
-    resetDemoData,
     isImpersonating,
     returnToDeveloperPortal,
     logoutCurrentSalon,
@@ -175,15 +173,6 @@ export const Navbar: React.FC = () => {
                 </button>
               )}
             </div>
-
-            {/* Botão Restaurar Demo */}
-            <button
-              onClick={resetDemoData}
-              title="Restaurar dados de demonstração"
-              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
 
             {/* Botão Sair / Terminar Sessão do Salão */}
             <button

@@ -5,6 +5,7 @@ import {
   saveActiveSession,
   loadActiveSession,
   clearActiveSession,
+  onStorageSync,
 } from '../services/storageEngine';
 import {
   calculateEndTime,
@@ -91,17 +92,20 @@ interface AppContextType {
   completeAppointment: (id: string) => Promise<boolean>;
 
   // Ação de Registo de Salão (Multi-Salão Isolado)
-  registerNewSalon: (params: {
-    name: string;
-    phone: string;
-    address: string;
-    nif?: string;
-    adminName: string;
-    adminEmail: string;
-    adminPassword?: string;
-    openingTime?: string;
-    closingTime?: string;
-  }) => Promise<boolean>;
+  registerNewSalon: (
+    params: {
+      name: string;
+      phone: string;
+      address: string;
+      nif?: string;
+      adminName: string;
+      adminEmail: string;
+      adminPassword?: string;
+      openingTime?: string;
+      closingTime?: string;
+    },
+    options?: { stayInCurrentMode?: boolean }
+  ) => Promise<boolean>;
 
   // Personalização do Salão (Admin Only - apenas o seu próprio salão)
   updateSalonCustomization: (salonId: string, data: { name?: string; logoUrl?: string; primaryColor?: string; startDayOfWeek?: number }) => Promise<boolean>;
@@ -220,6 +224,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     refreshData();
+    refreshAllSalonsSummary();
+
+    const handleStorageUpdate = () => {
+      refreshData();
+      refreshAllSalonsSummary();
+    };
+
+    window.addEventListener('storage', handleStorageUpdate);
+    const unbind = onStorageSync(handleStorageUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageUpdate);
+      unbind();
+    };
   }, [currentSalonId]);
 
   const currentSalon = useMemo(() => {
@@ -651,25 +669,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Registo de novo salão isolado
-  const registerNewSalon = async (params: {
-    name: string;
-    phone: string;
-    address: string;
-    nif?: string;
-    adminName: string;
-    adminEmail: string;
-    adminPassword?: string;
-    openingTime?: string;
-    closingTime?: string;
-  }): Promise<boolean> => {
+  const registerNewSalon = async (
+    params: {
+      name: string;
+      phone: string;
+      address: string;
+      nif?: string;
+      adminName: string;
+      adminEmail: string;
+      adminPassword?: string;
+      openingTime?: string;
+      closingTime?: string;
+    },
+    options?: { stayInCurrentMode?: boolean }
+  ): Promise<boolean> => {
     try {
       const { salon, adminUser } = await api.registerSalon(params);
-      setCurrentSalonIdState(salon.id);
-      setCurrentUserIdState(adminUser.id);
-      setAppMode('salon');
-      saveActiveSession({ appMode: 'salon', salonId: salon.id, userId: adminUser.id });
       await refreshData();
       await refreshAllSalonsSummary();
+
+      if (!options?.stayInCurrentMode && appMode !== 'developer') {
+        setCurrentSalonIdState(salon.id);
+        setCurrentUserIdState(adminUser.id);
+        setAppMode('salon');
+        saveActiveSession({ appMode: 'salon', salonId: salon.id, userId: adminUser.id });
+      }
       showNotification('success', `Salão "${salon.name}" registado com sucesso!`);
       return true;
     } catch (err: any) {

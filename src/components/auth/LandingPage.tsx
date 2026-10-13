@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Scissors,
@@ -17,9 +17,16 @@ export const LandingPage: React.FC = () => {
     loginSalonUser,
     registerNewSalon,
     loginDeveloper,
+    salons,
+    allSalonsSummary,
+    refreshAllSalonsSummary,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'login' | 'register' | null>(null);
+
+  useEffect(() => {
+    refreshAllSalonsSummary();
+  }, []);
 
   // Estados de Palavra-passe da Área de Programador
   const [isDevModalOpen, setIsDevModalOpen] = useState(false);
@@ -58,7 +65,7 @@ export const LandingPage: React.FC = () => {
     if (!cleanSalonName || !cleanPhone || !cleanAdminName || !cleanEmail) return;
 
     setIsRegistering(true);
-    await registerNewSalon({
+    const ok = await registerNewSalon({
       name: cleanSalonName,
       phone: cleanPhone,
       address: regAddress.trim() || 'Morada não indicada',
@@ -70,17 +77,27 @@ export const LandingPage: React.FC = () => {
       closingTime: regClosingTime,
     });
     setIsRegistering(false);
+
+    if (ok) {
+      setRegSalonName('');
+      setRegPhone('');
+      setRegAddress('');
+      setRegNif('');
+      setRegAdminName('');
+      setRegAdminEmail('');
+      setRegAdminPassword('');
+    }
   };
 
   // Submissão do Login de Salão
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    const cleanEmail = loginEmail.trim().toLowerCase();
-    if (!cleanEmail) return;
+    const cleanId = loginEmail.trim();
+    if (!cleanId) return;
 
     setIsLoggingIn(true);
-    const res = await loginSalonUser(cleanEmail, loginPassword.trim());
+    const res = await loginSalonUser(cleanId, loginPassword.trim());
     setIsLoggingIn(false);
     if (!res.success && res.error) {
       setLoginError(res.error);
@@ -338,7 +355,7 @@ export const LandingPage: React.FC = () => {
                   Entrar no meu Salão
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Introduza o seu e-mail e palavra-passe para aceder à sua agenda.
+                  Introduza o seu e-mail, nome do salão ou telefone para aceder à sua agenda.
                 </p>
               </div>
 
@@ -346,7 +363,7 @@ export const LandingPage: React.FC = () => {
                 <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2.5">
                   <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold">Acesso Bloqueado</p>
+                    <p className="font-bold">Acesso Não Concluído</p>
                     <p className="mt-0.5">{loginError}</p>
                   </div>
                 </div>
@@ -355,12 +372,12 @@ export const LandingPage: React.FC = () => {
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    E-mail do Colaborador / Administrador *
+                    E-mail, Nome do Salão ou Telefone *
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     required
-                    placeholder="ex: helena@atelierbeleza.pt"
+                    placeholder="ex: helena@atelierbeleza.pt, Nome do Salão ou 912345678"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
@@ -397,9 +414,77 @@ export const LandingPage: React.FC = () => {
                 disabled={isLoggingIn}
                 className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-sm rounded-xl transition-all shadow-md shadow-purple-200 flex items-center justify-center gap-2 cursor-pointer mt-4"
               >
-                <span>{isLoggingIn ? 'A verificar...' : 'Iniciar Sessão'}</span>
+                <span>{isLoggingIn ? 'A verificar...' : 'Iniciar Sessão no Salão'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
+
+              {/* Lista dos Salões Registados para Seleção Rápida */}
+              {salons.length > 0 && (
+                <div className="pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                      <Store className="w-3.5 h-3.5 text-purple-600" />
+                      Salões Registados ({salons.length}):
+                    </span>
+                    <span className="text-[10px] text-slate-400">Clique para selecionar</span>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {salons.map((s) => {
+                      const summary = allSalonsSummary.find((sum) => sum.salon.id === s.id);
+                      const admin = summary?.adminUser;
+                      const isSelected =
+                        loginEmail.trim().toLowerCase() === (admin?.email || '').toLowerCase() ||
+                        loginEmail.trim().toLowerCase() === s.name.toLowerCase();
+
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setLoginEmail(admin?.email || s.name);
+                            setLoginPassword(admin?.password || 'admin123');
+                            setLoginError(null);
+                          }}
+                          className={`w-full text-left p-2.5 rounded-2xl border transition-all flex items-center justify-between group cursor-pointer ${
+                            isSelected
+                              ? 'border-purple-500 bg-purple-50/70 shadow-xs'
+                              : 'border-slate-100 hover:border-purple-300 bg-slate-50 hover:bg-purple-50/30'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-black shrink-0 shadow-xs"
+                              style={{ backgroundColor: s.primaryColor || '#8B5CF6' }}
+                            >
+                              {s.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 group-hover:text-purple-700 transition-colors truncate">
+                                {s.name}
+                              </p>
+                              <p className="text-[10px] text-slate-500 truncate">
+                                {admin?.name ? `${admin.name} • ` : ''}
+                                {admin?.email || s.phone || s.address}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 transition-colors ${
+                              isSelected
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-purple-100/70 group-hover:bg-purple-200 text-purple-700'
+                            }`}
+                          >
+                            {isSelected ? 'Selecionado' : 'Selecionar'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </form>
           )}
         </div>

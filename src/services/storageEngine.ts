@@ -27,6 +27,26 @@ export interface ActiveSession {
 const IDB_NAME = 'salao_master_persistent_v1';
 const IDB_STORE = 'app_data_store';
 
+type StorageSyncListener = () => void;
+const listeners = new Set<StorageSyncListener>();
+
+export function onStorageSync(listener: StorageSyncListener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function notifyStorageSync(): void {
+  listeners.forEach((fn) => {
+    try {
+      fn();
+    } catch (e) {
+      console.error('Erro ao notificar listener de storage:', e);
+    }
+  });
+}
+
 function openIndexedDB(): Promise<IDBDatabase | null> {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
@@ -140,6 +160,7 @@ export function saveToStorage<T>(key: string, data: T[]): void {
 
   // 2. Gravar no IndexedDB de forma resiliente e permanente
   idbSet(key, data).catch((e) => console.error(`Erro ao sincronizar ${key} com IndexedDB:`, e));
+  notifyStorageSync();
 }
 
 /**
@@ -147,8 +168,6 @@ export function saveToStorage<T>(key: string, data: T[]): void {
  */
 function tryCleanOldCache() {
   try {
-    // Não apagamos dados essenciais como utilizadores ou salões!
-    // Apenas chaves transitórias se existirem
     const tempKeys = ['vite-plugin-pwa-cache'];
     tempKeys.forEach((k) => localStorage.removeItem(k));
   } catch {
@@ -157,11 +176,13 @@ function tryCleanOldCache() {
 }
 
 /**
- * Sincroniza dados do IndexedDB para o LocalStorage se o LocalStorage tiver sido apagado
+ * Sincroniza e faz MERGE seguro entre o LocalStorage e o IndexedDB.
+ * Se existirem salões/utilizadores em qualquer uma das camadas, junta-os garantindo
+ * que NENHUM dado gravado se perde, mesmo que uma das camadas tenha sido apagada.
  */
-export async function syncFromIndexedDBIfEmpty(): Promise<boolean> {
+export async function syncAndMergeStorage(): Promise<boolean> {
   try {
-    let synced = false;
+    let changed = false;
     const keysToCheck = [
       STORAGE_KEYS.SALONS,
       STORAGE_KEYS.USERS,
@@ -171,24 +192,68 @@ export async function syncFromIndexedDBIfEmpty(): Promise<boolean> {
     ];
 
     for (const key of keysToCheck) {
+      let lsArray: any[] = [];
       const lsRaw = localStorage.getItem(key);
-      if (!lsRaw) {
-        const idbData = await idbGet<any[]>(key);
-        if (idbData && Array.isArray(idbData) && idbData.length > 0) {
-          try {
-            localStorage.setItem(key, JSON.stringify(idbData));
-            synced = true;
-          } catch {
-            // Se o LocalStorage estiver cheio, fica no IndexedDB
-          }
+      if (lsRaw) {
+        try {
+          const parsed = JSON.parse(lsRaw);
+          if (Array.isArray(parsed)) lsArray = parsed;
+        } catch {}
+      }
+
+      const idbData = await idbGet<any[]>(key);
+      const idbArray = Array.isArray(idbData) ? idbData : [];
+
+      if (lsArray.length === 0 && idbArray.length === 0) {
+        continue;
+      }
+
+      // Merge inteligente por ID
+      const map = new Map<string, any>();
+      for (const item of idbArray) {
+        if (item && item.id) map.set(item.id, item);
+      }
+      for (const item of lsArray) {
+        if (item && item.id) {
+          const prev = map.get(item.id);
+          map.set(item.id, prev ? { ...prev, ...item } : item);
         }
       }
+
+      const merged = Array.from(map.values());
+      if (merged.length > lsArray.length || merged.length > idbArray.length) {
+        try {
+          localStorage.setItem(key, JSON.stringify(merged));
+        } catch {}
+        await idbSet(key, merged);
+        changed = true;
+      } else if (lsArray.length > 0 && idbArray.length === 0) {
+        // Assegurar que IndexedDB tem a cópia do LocalStorage
+        await idbSet(key, lsArray);
+      } else if (lsArray.length === 0 && idbArray.length > 0) {
+        // Assegurar que LocalStorage é restaurado a partir do IndexedDB
+        try {
+          localStorage.setItem(key, JSON.stringify(idbArray));
+        } catch {}
+        changed = true;
+      }
     }
-    return synced;
+
+    if (changed) {
+      notifyStorageSync();
+    }
+    return changed;
   } catch (e) {
-    console.error('Erro na sincronização IndexedDB:', e);
+    console.error('Erro na sincronização e merge de armazenamento:', e);
     return false;
   }
+}
+
+/**
+ * Alias de compatibilidade
+ */
+export async function syncFromIndexedDBIfEmpty(): Promise<boolean> {
+  return syncAndMergeStorage();
 }
 
 /**

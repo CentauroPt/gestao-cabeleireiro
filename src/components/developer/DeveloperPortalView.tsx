@@ -33,6 +33,7 @@ export const DeveloperPortalView: React.FC = () => {
     registerNewSalon,
     changeDeveloperPassword,
     changeSalonPassword,
+    resetDemoData,
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -131,14 +132,17 @@ export const DeveloperPortalView: React.FC = () => {
     e.preventDefault();
     if (!newSalonName || !newSalonPhone || !newSalonAdminName || !newSalonAdminEmail) return;
 
-    await registerNewSalon({
-      name: newSalonName,
-      phone: newSalonPhone,
-      address: newSalonAddress || 'Morada indicada pelo programador',
-      nif: newSalonNif,
-      adminName: newSalonAdminName,
-      adminEmail: newSalonAdminEmail,
-    });
+    await registerNewSalon(
+      {
+        name: newSalonName,
+        phone: newSalonPhone,
+        address: newSalonAddress || 'Morada indicada pelo programador',
+        nif: newSalonNif,
+        adminName: newSalonAdminName,
+        adminEmail: newSalonAdminEmail,
+      },
+      { stayInCurrentMode: true }
+    );
 
     setIsNewSalonModalOpen(false);
     setNewSalonName('');
@@ -242,6 +246,24 @@ export const DeveloperPortalView: React.FC = () => {
             >
               <PlusCircle className="w-4 h-4" />
               <span>+ Novo Salão</span>
+            </button>
+
+            <button
+              onClick={() => {
+                if (
+                  confirm(
+                    'ATENÇÃO: Deseja repor os dados de demonstração de fábrica? Todos os novos salões registados serão eliminados permanentemente.'
+                  )
+                ) {
+                  resetDemoData();
+                  refreshAllSalonsSummary();
+                }
+              }}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Repor dados de fábrica (Apenas para testes)"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Repor Demonstração</span>
             </button>
 
             <button
