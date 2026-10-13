@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Scissors,
@@ -13,9 +13,7 @@ import {
   LogOut,
   ArrowLeft,
   Lock,
-  Palette,
 } from 'lucide-react';
-import { SalonCustomizationModal } from '../salon/SalonCustomizationModal';
 
 export const Navbar: React.FC = () => {
   const {
@@ -33,8 +31,6 @@ export const Navbar: React.FC = () => {
     setActiveTab,
     isAdminUnlocked,
   } = useApp();
-
-  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
 
   const handleAdminClick = () => {
     if (currentUser?.role === 'ADMIN') {
@@ -108,23 +104,7 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Salão Ativo (Isolado) & Controlos */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Botão Personalizar Salão (Apenas para o Administrador) */}
-            {currentUser?.role === 'ADMIN' && (
-              <button
-                type="button"
-                onClick={() => setIsCustomizationOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-purple-50 text-slate-700 hover:text-purple-700 border border-slate-200 hover:border-purple-200 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
-                title="Personalizar logótipo e cores do seu salão"
-              >
-                <Palette
-                  className="w-3.5 h-3.5 shrink-0"
-                  style={{ color: currentSalon?.primaryColor || '#8B5CF6' }}
-                />
-                <span className="hidden md:inline">Personalizar Salão</span>
-              </button>
-            )}
-
+          <div className="flex items-center gap-3">
             {/* Salão Atual - Apenas mostra o salão em que se encontra */}
             <div className="flex items-center gap-2 bg-purple-50/70 border border-purple-200/80 rounded-xl px-3 py-1.5">
               <Store className="w-4 h-4 text-purple-600 shrink-0" />
@@ -241,11 +221,6 @@ export const Navbar: React.FC = () => {
             </button>
           </div>
         </div>
-      )}
-
-      {/* Modal de Personalização de Cores e Logótipo do Salão */}
-      {isCustomizationOpen && (
-        <SalonCustomizationModal onClose={() => setIsCustomizationOpen(false)} />
       )}
     </header>
   );

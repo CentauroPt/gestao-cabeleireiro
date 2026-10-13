@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, Upload, Palette, Image as ImageIcon, Check, Sparkles, Trash2, Scissors } from 'lucide-react';
+import {
+  X,
+  Upload,
+  Palette,
+  Image as ImageIcon,
+  Check,
+  Sparkles,
+  Trash2,
+  Scissors,
+  Store,
+} from 'lucide-react';
 
 interface Props {
   onClose: () => void;
@@ -22,6 +32,7 @@ const COLOR_PRESETS = [
 export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
   const { currentSalon, updateSalonCustomization } = useApp();
 
+  const [salonName, setSalonName] = useState<string>(currentSalon?.name || '');
   const [primaryColor, setPrimaryColor] = useState<string>(
     currentSalon?.primaryColor || '#8B5CF6'
   );
@@ -57,8 +68,14 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
     e.preventDefault();
     if (!currentSalon) return;
 
+    if (!salonName.trim()) {
+      setError('O nome do salão é obrigatório.');
+      return;
+    }
+
     setIsSaving(true);
     const success = await updateSalonCustomization(currentSalon.id, {
+      name: salonName.trim(),
       primaryColor,
       logoUrl: logoUrl.trim() || undefined,
     });
@@ -83,10 +100,10 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                Personalização de Cores & Logótipo
+                Personalização do Salão
               </h2>
               <p className="text-xs text-slate-500">
-                Exclusivo para o salão <strong>{currentSalon?.name}</strong>
+                Nome, cores e logótipo exclusivos do salão <strong>{salonName || currentSalon?.name}</strong>
               </p>
             </div>
           </div>
@@ -98,17 +115,38 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-6 space-y-6">
+        <form onSubmit={handleSave} className="p-6 space-y-5">
           {error && (
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
               {error}
             </div>
           )}
 
-          {/* Secção 1: Logótipo do Salão */}
+          {/* Nome do Salão */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Nome do Salão *
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                required
+                value={salonName}
+                onChange={(e) => setSalonName(e.target.value)}
+                placeholder="Ex: Atelier de Beleza & Estilo"
+                className="w-full text-sm pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none font-bold text-slate-900"
+              />
+              <Store className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Cada administrador pode alterar o nome do seu próprio salão. O nome atualiza imediatamente no topo do ecrã.
+            </p>
+          </div>
+
+          {/* Secção: Logótipo do Salão */}
           <div className="space-y-3">
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-              1. Logótipo do Salão (Aparece no início da página do lado esquerdo)
+              Logótipo do Salão (Aparece no início da página do lado esquerdo)
             </label>
 
             <div className="flex items-center gap-4 p-3.5 bg-slate-50/70 border border-slate-200 rounded-2xl">

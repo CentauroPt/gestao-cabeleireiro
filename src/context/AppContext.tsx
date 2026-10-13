@@ -99,7 +99,7 @@ interface AppContextType {
   }) => Promise<boolean>;
 
   // Personalização do Salão (Admin Only - apenas o seu próprio salão)
-  updateSalonCustomization: (salonId: string, data: { logoUrl?: string; primaryColor?: string }) => Promise<boolean>;
+  updateSalonCustomization: (salonId: string, data: { name?: string; logoUrl?: string; primaryColor?: string }) => Promise<boolean>;
 
   // Ações de Clientes
   addClient: (data: {
@@ -654,11 +654,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ================= PERSONALIZAÇÃO DO SALÃO (ADMIN ONLY) =================
   const updateSalonCustomization = async (
     salonId: string,
-    data: { logoUrl?: string; primaryColor?: string }
+    data: { name?: string; logoUrl?: string; primaryColor?: string }
   ): Promise<boolean> => {
     if (!currentSalon || !currentUser) return false;
     if (currentUser.role !== 'ADMIN') {
-      showNotification('error', 'Apenas o Administrador pode alterar as cores e o logótipo do salão.');
+      showNotification('error', 'Apenas o Administrador pode alterar os dados e a personalização do salão.');
       return false;
     }
     if (currentSalon.id !== salonId) {
@@ -670,7 +670,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await api.updateSalon(salonId, data);
       await refreshData();
       await refreshAllSalonsSummary();
-      showNotification('success', 'Personalização do salão (cores e logótipo) gravada com sucesso!');
+      showNotification('success', 'Dados e personalização do salão (nome, cores e logótipo) gravados com sucesso!');
       return true;
     } catch (err: any) {
       showNotification('error', err.message || 'Erro ao gravar personalização do salão.');

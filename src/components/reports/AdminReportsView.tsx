@@ -409,11 +409,11 @@ export const AdminReportsView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
           <button
             onClick={() => setIsCustomizationOpen(true)}
-            className="px-3.5 py-2 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:opacity-95"
-            style={{ backgroundColor: currentSalon?.primaryColor || '#8B5CF6' }}
-            title="Personalizar as cores e logótipo do seu salão"
+            className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 hover:border-purple-300 rounded-full text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-2xs"
+            title="Personalizar nome, cores e logótipo do seu salão"
           >
-            <Palette className="w-4 h-4" /> Personalizar Cores & Logótipo
+            <Palette className="w-4 h-4 text-purple-600" />
+            <span>Personalizar Salão</span>
           </button>
           <button
             onClick={() => window.print()}
@@ -450,7 +450,7 @@ export const AdminReportsView: React.FC = () => {
           )}
           <div>
             <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-              Identidade Visual do Salão ({currentSalon?.name})
+              Identidade & Nome do Salão ({currentSalon?.name})
               <span
                 className="w-3.5 h-3.5 rounded-full inline-block shadow-xs border border-white"
                 style={{ backgroundColor: currentSalon?.primaryColor || '#8B5CF6' }}
@@ -458,7 +458,7 @@ export const AdminReportsView: React.FC = () => {
               />
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Personalize as cores e o logótipo exclusivo do seu salão de cabeleireiro. O logótipo surge no topo esquerdo da página.
+              Altere o nome, as cores e o logótipo exclusivo do seu salão de cabeleireiro.
             </p>
           </div>
         </div>
@@ -466,10 +466,10 @@ export const AdminReportsView: React.FC = () => {
         <button
           type="button"
           onClick={() => setIsCustomizationOpen(true)}
-          className="px-4 py-2.5 bg-white hover:bg-purple-50 text-slate-800 hover:text-purple-700 border border-slate-200 hover:border-purple-300 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-2 shrink-0"
+          className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 hover:border-purple-300 rounded-full text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-2 shrink-0"
         >
           <Palette className="w-4 h-4 text-purple-600" />
-          <span>Alterar Cores & Logótipo</span>
+          <span>Personalizar Salão</span>
         </button>
       </div>
 
