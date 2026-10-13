@@ -35,6 +35,7 @@ export const LandingPage: React.FC = () => {
   const [regAdminName, setRegAdminName] = useState('');
   const [regAdminEmail, setRegAdminEmail] = useState('');
   const [regAdminPassword, setRegAdminPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [regOpeningTime, setRegOpeningTime] = useState('09:00');
   const [regClosingTime, setRegClosingTime] = useState('20:00');
   const [isRegistering, setIsRegistering] = useState(false);
@@ -42,6 +43,7 @@ export const LandingPage: React.FC = () => {
   // Estados de Login de Salão Existente
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -262,14 +264,24 @@ export const LandingPage: React.FC = () => {
                         <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                           Palavra-passe *
                         </label>
-                        <input
-                          type="password"
-                          required
-                          placeholder="••••••••"
-                          value={regAdminPassword}
-                          onChange={(e) => setRegAdminPassword(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showRegPassword ? 'text' : 'password'}
+                            required
+                            placeholder="••••••••"
+                            value={regAdminPassword}
+                            onChange={(e) => setRegAdminPassword(e.target.value)}
+                            className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRegPassword(!showRegPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1 transition-colors"
+                            title={showRegPassword ? 'Ocultar palavra-passe' : 'Mostrar palavra-passe'}
+                          >
+                            {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -353,14 +365,24 @@ export const LandingPage: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Palavra-passe *
                   </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showLoginPassword ? 'text' : 'password'}
+                      required
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1 transition-colors"
+                      title={showLoginPassword ? 'Ocultar palavra-passe' : 'Mostrar palavra-passe'}
+                    >
+                      {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
 
