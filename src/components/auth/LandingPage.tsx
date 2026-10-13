@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Scissors,
@@ -17,16 +17,9 @@ export const LandingPage: React.FC = () => {
     loginSalonUser,
     registerNewSalon,
     loginDeveloper,
-    salons,
-    allSalonsSummary,
-    refreshAllSalonsSummary,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'login' | 'register' | null>(null);
-
-  useEffect(() => {
-    refreshAllSalonsSummary();
-  }, []);
 
   // Estados de Palavra-passe da Área de Programador
   const [isDevModalOpen, setIsDevModalOpen] = useState(false);
@@ -417,74 +410,6 @@ export const LandingPage: React.FC = () => {
                 <span>{isLoggingIn ? 'A verificar...' : 'Iniciar Sessão no Salão'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-
-              {/* Lista dos Salões Registados para Seleção Rápida */}
-              {salons.length > 0 && (
-                <div className="pt-4 border-t border-slate-100">
-                  <div className="flex items-center justify-between mb-2.5">
-                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-                      <Store className="w-3.5 h-3.5 text-purple-600" />
-                      Salões Registados ({salons.length}):
-                    </span>
-                    <span className="text-[10px] text-slate-400">Clique para selecionar</span>
-                  </div>
-
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {salons.map((s) => {
-                      const summary = allSalonsSummary.find((sum) => sum.salon.id === s.id);
-                      const admin = summary?.adminUser;
-                      const isSelected =
-                        loginEmail.trim().toLowerCase() === (admin?.email || '').toLowerCase() ||
-                        loginEmail.trim().toLowerCase() === s.name.toLowerCase();
-
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => {
-                            setLoginEmail(admin?.email || s.name);
-                            setLoginPassword(admin?.password || 'admin123');
-                            setLoginError(null);
-                          }}
-                          className={`w-full text-left p-2.5 rounded-2xl border transition-all flex items-center justify-between group cursor-pointer ${
-                            isSelected
-                              ? 'border-purple-500 bg-purple-50/70 shadow-xs'
-                              : 'border-slate-100 hover:border-purple-300 bg-slate-50 hover:bg-purple-50/30'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div
-                              className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-black shrink-0 shadow-xs"
-                              style={{ backgroundColor: s.primaryColor || '#8B5CF6' }}
-                            >
-                              {s.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-slate-900 group-hover:text-purple-700 transition-colors truncate">
-                                {s.name}
-                              </p>
-                              <p className="text-[10px] text-slate-500 truncate">
-                                {admin?.name ? `${admin.name} • ` : ''}
-                                {admin?.email || s.phone || s.address}
-                              </p>
-                            </div>
-                          </div>
-
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 transition-colors ${
-                              isSelected
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-purple-100/70 group-hover:bg-purple-200 text-purple-700'
-                            }`}
-                          >
-                            {isSelected ? 'Selecionado' : 'Selecionar'}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </form>
           )}
         </div>
