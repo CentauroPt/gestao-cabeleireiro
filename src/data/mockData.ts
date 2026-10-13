@@ -13,6 +13,7 @@ export const mockSalons: Salon[] = [
     status: 'ATIVO',
     createdAt: '2026-08-10T10:00:00.000Z',
     primaryColor: '#8B5CF6',
+    startDayOfWeek: 1,
   },
   {
     id: 'salon-2',
@@ -26,6 +27,7 @@ export const mockSalons: Salon[] = [
     status: 'ATIVO',
     createdAt: '2026-09-01T14:30:00.000Z',
     primaryColor: '#059669',
+    startDayOfWeek: 1,
   },
   {
     id: 'salon-3',
@@ -40,6 +42,7 @@ export const mockSalons: Salon[] = [
     suspensionReason: 'Mensalidade pendente de regularização',
     createdAt: '2026-09-20T11:00:00.000Z',
     primaryColor: '#D97706',
+    startDayOfWeek: 1,
   },
 ];
 

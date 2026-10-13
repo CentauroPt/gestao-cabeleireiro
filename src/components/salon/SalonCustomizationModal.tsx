@@ -11,6 +11,7 @@ import {
   Trash2,
   Scissors,
   Store,
+  Calendar,
 } from 'lucide-react';
 
 interface Props {
@@ -30,6 +31,16 @@ const COLOR_PRESETS = [
   { name: 'Preto Luxo', hex: '#0F172A' },
 ];
 
+const WEEK_START_OPTIONS = [
+  { day: 1, label: 'Segunda-feira', short: '2ª feira', tip: 'Padrão' },
+  { day: 2, label: 'Terça-feira', short: '3ª feira', tip: 'Comum em salões' },
+  { day: 3, label: 'Quarta-feira', short: '4ª feira', tip: '' },
+  { day: 4, label: 'Quinta-feira', short: '5ª feira', tip: '' },
+  { day: 5, label: 'Sexta-feira', short: '6ª feira', tip: '' },
+  { day: 6, label: 'Sábado', short: 'Sábado', tip: '' },
+  { day: 0, label: 'Domingo', short: 'Domingo', tip: '' },
+];
+
 export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
   const { currentSalon, updateSalonCustomization } = useApp();
 
@@ -38,6 +49,9 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
     currentSalon?.primaryColor || '#8B5CF6'
   );
   const [logoUrl, setLogoUrl] = useState<string>(currentSalon?.logoUrl || '');
+  const [startDayOfWeek, setStartDayOfWeek] = useState<number>(
+    currentSalon?.startDayOfWeek !== undefined ? currentSalon.startDayOfWeek : 1
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,6 +103,7 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
       name: salonName.trim(),
       primaryColor,
       logoUrl: logoUrl.trim() || undefined,
+      startDayOfWeek,
     });
     setIsSaving(false);
 
@@ -298,6 +313,59 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
                   Separador Ativo
                 </span>
               </div>
+            </div>
+          </div>
+
+          {/* Secção 3: Dia de Início da Semana de Trabalho na Agenda */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-purple-600" />
+                3. Início da Semana de Trabalho na Agenda
+              </label>
+              <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200/60">
+                {WEEK_START_OPTIONS.find((o) => o.day === startDayOfWeek)?.label}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Escolha em que dia da semana a agenda semanal deste salão começa a contar (ex.: se o seu salão encerra à 2ª feira, selecione Terça-feira).
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              {WEEK_START_OPTIONS.map((opt) => {
+                const isSelected = startDayOfWeek === opt.day;
+                return (
+                  <button
+                    key={opt.day}
+                    type="button"
+                    onClick={() => setStartDayOfWeek(opt.day)}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-slate-900 bg-slate-50 ring-2 ring-slate-900/10 shadow-xs'
+                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-bold text-slate-800">
+                        {opt.short}
+                      </span>
+                      {isSelected && (
+                        <span
+                          className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px]"
+                          style={{ backgroundColor: primaryColor }}
+                        >
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                    {opt.tip && (
+                      <span className="text-[10px] text-slate-400 mt-1 leading-tight">
+                        {opt.tip}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

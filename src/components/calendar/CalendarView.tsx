@@ -166,13 +166,17 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
     return timeSlots.length > 0 ? parseTimeToMinutes(timeSlots[0]) : 9 * 60;
   }, [timeSlots]);
 
-  // Calcular os 7 dias da semana completa (Segunda-feira a Domingo)
+  // Calcular os 7 dias da semana completa (consoante o dia de início escolhido pelo administrador do salão)
   const weekDays = useMemo(() => {
     const [y, m, d] = currentDateStr.split('-').map(Number);
     const baseDate = new Date(y, m - 1, d);
     const dayOfWeek = baseDate.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
-    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const monday = new Date(y, m - 1, d + diffToMonday);
+
+    // Dia de início da semana configurado pelo salão (0 = Domingo, 1 = Segunda, ..., 6 = Sábado; padrão: 1 = Segunda-feira)
+    const targetStartDay = currentSalon?.startDayOfWeek !== undefined ? currentSalon.startDayOfWeek : 1;
+    let diff = dayOfWeek - targetStartDay;
+    if (diff < 0) diff += 7;
+    const weekStartDate = new Date(y, m - 1, d - diff);
 
     const days: {
       dateStr: string;
@@ -183,7 +187,7 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
     }[] = [];
 
     for (let i = 0; i < 7; i++) {
-      const dt = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
+      const dt = new Date(weekStartDate.getFullYear(), weekStartDate.getMonth(), weekStartDate.getDate() + i);
       const yyyy = dt.getFullYear();
       const mm = String(dt.getMonth() + 1).padStart(2, '0');
       const dd = String(dt.getDate()).padStart(2, '0');
@@ -197,7 +201,7 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
       });
     }
     return days;
-  }, [currentDateStr]);
+  }, [currentDateStr, currentSalon?.startDayOfWeek, todayStr]);
 
   // Navegação de semanas ou dias consoante a vista ativa
   const handlePrev = () => {

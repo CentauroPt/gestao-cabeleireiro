@@ -51,6 +51,7 @@ export class ApiService {
         primaryColor: s.primaryColor || mockMatch?.primaryColor || '#8B5CF6',
         logoUrl: s.logoUrl || mockMatch?.logoUrl,
         createdAt: s.createdAt || mockMatch?.createdAt || new Date().toISOString(),
+        startDayOfWeek: s.startDayOfWeek !== undefined ? s.startDayOfWeek : (mockMatch?.startDayOfWeek ?? 1),
       };
     });
 
@@ -144,6 +145,7 @@ export class ApiService {
       status: 'ATIVO',
       createdAt: new Date().toISOString(),
       primaryColor: '#8B5CF6',
+      startDayOfWeek: 1,
     };
     this.salons.push(newSalon);
     saveToStorage(STORAGE_KEYS.SALONS, this.salons);

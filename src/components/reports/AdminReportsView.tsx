@@ -71,6 +71,7 @@ export const AdminReportsView: React.FC = () => {
     isAdminUnlocked,
     unlockAdmin,
     lockAdmin,
+    updateSalonCustomization,
   } = useApp();
 
   // Estados de Autenticação
@@ -431,8 +432,8 @@ export const AdminReportsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Cartão de Personalização do Salão no Painel de Administrador */}
-      <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-slate-50 border border-purple-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* Cartão de Personalização do Salão e Início de Semana na Página do Administrador */}
+      <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-slate-50 border border-purple-200/80 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           {currentSalon?.logoUrl ? (
             <img
@@ -450,7 +451,7 @@ export const AdminReportsView: React.FC = () => {
           )}
           <div>
             <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-              Identidade & Nome do Salão ({currentSalon?.name})
+              Configurações & Identidade do Salão ({currentSalon?.name})
               <span
                 className="w-3.5 h-3.5 rounded-full inline-block shadow-xs border border-white"
                 style={{ backgroundColor: currentSalon?.primaryColor || '#8B5CF6' }}
@@ -458,19 +459,51 @@ export const AdminReportsView: React.FC = () => {
               />
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Altere o nome, as cores e o logótipo exclusivo do seu salão de cabeleireiro.
+              Personalize o nome, logótipo, cores e defina o <strong>dia de início da semana de trabalho</strong> da agenda.
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsCustomizationOpen(true)}
-          className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 hover:border-purple-300 rounded-full text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-2 shrink-0"
-        >
-          <Palette className="w-4 h-4 text-purple-600" />
-          <span>Personalizar Salão</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Seletor do Dia de Início da Semana de Trabalho */}
+          <div className="flex items-center gap-2 bg-white border border-slate-200/80 rounded-xl px-3 py-1.5 shadow-2xs">
+            <Calendar className="w-4 h-4 text-purple-600 shrink-0" />
+            <div className="flex flex-col">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">
+                Início da Semana:
+              </span>
+              <select
+                value={currentSalon?.startDayOfWeek !== undefined ? currentSalon.startDayOfWeek : 1}
+                onChange={async (e) => {
+                  const dayVal = Number(e.target.value);
+                  if (currentSalon) {
+                    await updateSalonCustomization(currentSalon.id, { startDayOfWeek: dayVal });
+                  }
+                }}
+                className="text-xs font-extrabold text-slate-800 bg-transparent border-none outline-none cursor-pointer p-0"
+                title="Escolha o dia em que a semana de trabalho começa na agenda semanal"
+              >
+                <option value={1}>Segunda-feira (Padrão)</option>
+                <option value={2}>Terça-feira (Ideal p/ fecho à 2ª)</option>
+                <option value={3}>Quarta-feira</option>
+                <option value={4}>Quinta-feira</option>
+                <option value={5}>Sexta-feira</option>
+                <option value={6}>Sábado</option>
+                <option value={0}>Domingo</option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsCustomizationOpen(true)}
+            className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 hover:border-purple-300 rounded-full text-xs font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-2 shrink-0"
+            title="Personalizar nome, cores, logótipo e semana de trabalho do seu salão"
+          >
+            <Palette className="w-4 h-4 text-purple-600" />
+            <span>Personalizar Salão</span>
+          </button>
+        </div>
       </div>
 
       {/* ======================================================== */}

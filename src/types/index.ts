@@ -18,6 +18,7 @@ export interface Salon {
   suspensionReason?: string;
   logoUrl?: string; // Logótipo personalizado do salão
   primaryColor?: string; // Cor principal personalizada do salão (Hex)
+  startDayOfWeek?: number; // Dia de início da semana (0 = Domingo, 1 = Segunda, 2 = Terça, ..., 6 = Sábado; padrão: 1)
 }
 
 export interface User {
