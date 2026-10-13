@@ -3,6 +3,10 @@
 :root {
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   color-scheme: light;
+  --salon-primary: #8B5CF6;
+  --salon-primary-shadow: rgba(139, 92, 246, 0.25);
+  --salon-primary-light: rgba(139, 92, 246, 0.12);
+  --salon-primary-border: rgba(139, 92, 246, 0.25);
 }
 
 body {
@@ -16,4 +20,70 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* ========================================================
+   ESTILOS DINÂMICOS DO SALÃO (COR PRIMÁRIA PERSONALIZADA)
+   Quando o administrador altera a cor do salão, todos os botões,
+   separadores ativos e destaques desse salão mudam para a cor escolhida.
+   ======================================================== */
+
+.salon-theme button.bg-purple-600,
+.salon-theme a.bg-purple-600,
+.salon-theme .bg-purple-600,
+.salon-theme .btn-salon-primary {
+  background-color: var(--salon-primary, #8B5CF6) !important;
+  color: #ffffff !important;
+}
+
+.salon-theme button.bg-purple-600:hover:not(:disabled),
+.salon-theme a.bg-purple-600:hover,
+.salon-theme .hover\:bg-purple-700:hover:not(:disabled),
+.salon-theme .btn-salon-primary:hover:not(:disabled) {
+  background-color: var(--salon-primary, #8B5CF6) !important;
+  filter: brightness(0.9) !important;
+}
+
+.salon-theme button.bg-purple-600:active:not(:disabled),
+.salon-theme .btn-salon-primary:active:not(:disabled) {
+  filter: brightness(0.82) !important;
+}
+
+/* Sombras coloridas dos botões do salão */
+.salon-theme .shadow-purple-200,
+.salon-theme .shadow-purple-300,
+.salon-theme .shadow-purple-100 {
+  box-shadow: 0 4px 10px -1px var(--salon-primary-shadow, rgba(139, 92, 246, 0.25)) !important;
+}
+
+/* Textos e ícones primários do salão */
+.salon-theme .text-purple-600,
+.salon-theme .text-purple-700 {
+  color: var(--salon-primary, #8B5CF6) !important;
+}
+
+/* Fundos suaves de destaque (badges, seleções suaves) */
+.salon-theme .bg-purple-50,
+.salon-theme .bg-purple-50\/70,
+.salon-theme .bg-purple-50\/80,
+.salon-theme .bg-purple-50\/60,
+.salon-theme .bg-purple-100,
+.salon-theme .bg-purple-100\/90 {
+  background-color: var(--salon-primary-light, rgba(139, 92, 246, 0.12)) !important;
+}
+
+/* Bordas primárias do salão */
+.salon-theme .border-purple-200,
+.salon-theme .border-purple-200\/80,
+.salon-theme .border-purple-300,
+.salon-theme .border-purple-500,
+.salon-theme .border-purple-600 {
+  border-color: var(--salon-primary-border, rgba(139, 92, 246, 0.25)) !important;
+}
+
+/* Anéis de foco / seleção */
+.salon-theme .ring-purple-500,
+.salon-theme .ring-purple-600,
+.salon-theme .ring-purple-500\/20 {
+  --tw-ring-color: var(--salon-primary, #8B5CF6) !important;
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { compressImage } from '../../utils/imageCompressor';
 import {
@@ -40,6 +40,22 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
   const [logoUrl, setLogoUrl] = useState<string>(currentSalon?.logoUrl || '');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sincroniza a cor em tempo real no documento para que todos os botões do salão reflitam a escolha imediatamente
+  useEffect(() => {
+    document.documentElement.style.setProperty('--salon-primary', primaryColor);
+    document.documentElement.style.setProperty('--salon-primary-shadow', `${primaryColor}40`);
+    document.documentElement.style.setProperty('--salon-primary-light', `${primaryColor}18`);
+    document.documentElement.style.setProperty('--salon-primary-border', `${primaryColor}45`);
+
+    return () => {
+      const original = currentSalon?.primaryColor || '#8B5CF6';
+      document.documentElement.style.setProperty('--salon-primary', original);
+      document.documentElement.style.setProperty('--salon-primary-shadow', `${original}40`);
+      document.documentElement.style.setProperty('--salon-primary-light', `${original}18`);
+      document.documentElement.style.setProperty('--salon-primary-border', `${original}45`);
+    };
+  }, [primaryColor, currentSalon?.primaryColor]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -251,6 +267,37 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Demonstração visual dos botões nesta cor */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                Visualização dos botões deste salão com esta cor:
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="px-3.5 py-1.5 text-white rounded-xl text-xs font-bold shadow-md cursor-default transition-all"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  + Nova Reserva
+                </button>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="px-3 py-1.5 text-white rounded-xl text-xs font-bold shadow-md cursor-default transition-all"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  Registar Cliente
+                </button>
+                <span
+                  className="px-2.5 py-1 text-white rounded-lg text-[11px] font-semibold cursor-default transition-all"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  Separador Ativo
+                </span>
+              </div>
             </div>
           </div>
 
