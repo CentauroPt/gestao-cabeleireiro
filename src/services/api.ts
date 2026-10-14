@@ -313,6 +313,7 @@ export class ApiService {
 
   // Resumo de todos os salões para a Consola do Programador
   async getAllSalonsSummary(): Promise<SalonSummary[]> {
+    await syncAndMergeStorage();
     this.reloadFromStorage();
     return this.salons.map((salon) => {
       const salonUsers = this.users.filter((u) => u.salonId === salon.id);

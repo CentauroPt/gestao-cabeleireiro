@@ -76,6 +76,27 @@ export const DeveloperPortalView: React.FC = () => {
   const [showSalonPassword, setShowSalonPassword] = useState(false);
   const [salonPasswordError, setSalonPasswordError] = useState('');
   const [isSavingSalonPassword, setIsSavingSalonPassword] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshAllSalonsSummary();
+      setNotification({
+        type: 'success',
+        message: 'Dados e salões atualizados com sucesso!',
+      });
+    } catch (e: any) {
+      setNotification({
+        type: 'error',
+        message: 'Erro ao atualizar dados: ' + (e?.message || 'Falha de comunicação'),
+      });
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 600);
+    }
+  };
 
   useEffect(() => {
     refreshAllSalonsSummary();
@@ -276,12 +297,13 @@ export const DeveloperPortalView: React.FC = () => {
 
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
-              onClick={() => refreshAllSalonsSummary()}
-              className="px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Atualizar dados"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="px-3.5 py-2 bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-75 shadow-xs"
+              title="Atualizar dados de todos os salões"
             >
-              <RefreshCw className="w-4 h-4" />
-              <span>Atualizar</span>
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-purple-400' : ''}`} />
+              <span>{isRefreshing ? 'A atualizar...' : 'Atualizar'}</span>
             </button>
 
             <button
