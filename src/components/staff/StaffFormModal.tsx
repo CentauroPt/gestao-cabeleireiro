@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { User, Role } from '../../types';
 import { useApp } from '../../context/AppContext';
-import { X, UserCheck, Mail, Phone, Palette, Shield } from 'lucide-react';
+import { X, UserCheck, Mail, Phone, Palette, Shield, ShieldCheck, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface Props {
   initialUser?: User | null;
@@ -21,12 +21,14 @@ const PRESET_COLORS = [
 ];
 
 export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSuccess }) => {
-  const { addUser, updateUser } = useApp();
+  const { users, currentSalon, addUser, updateUser } = useApp();
 
   const [name, setName] = useState(initialUser?.name || '');
   const [email, setEmail] = useState(initialUser?.email || '');
   const [phone, setPhone] = useState(initialUser?.phone || '');
   const [role, setRole] = useState<Role>(initialUser?.role || 'COLABORADOR');
+  const [password, setPassword] = useState(initialUser?.password || '');
+  const [showPassword, setShowPassword] = useState(false);
   const [color, setColor] = useState(initialUser?.color || PRESET_COLORS[0]);
   const [specialtiesStr, setSpecialtiesStr] = useState(initialUser?.specialties.join(', ') || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,6 +47,16 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
       return;
     }
 
+    if (initialUser && initialUser.role === 'ADMIN' && role === 'COLABORADOR') {
+      const remainingAdmins = users.filter(
+        (u) => u.salonId === currentSalon?.id && u.role === 'ADMIN' && u.id !== initialUser.id
+      );
+      if (remainingAdmins.length === 0) {
+        setError('O salão deve manter pelo menos um Administrador. Promova outro membro antes de despromover este utilizador.');
+        return;
+      }
+    }
+
     const specialties = specialtiesStr
       .split(',')
       .map((s) => s.trim())
@@ -53,12 +65,15 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
     setIsSubmitting(true);
     let success = false;
 
+    const adminPassword = role === 'ADMIN' ? (password.trim() || initialUser?.password || 'admin123') : undefined;
+
     if (initialUser) {
       success = await updateUser(initialUser.id, {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
         role,
+        ...(role === 'ADMIN' ? { password: adminPassword } : {}),
         color,
         specialties,
       });
@@ -68,6 +83,7 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
         email: email.trim(),
         phone: phone.trim(),
         role,
+        ...(role === 'ADMIN' ? { password: adminPassword } : {}),
         color,
         specialties,
         active: true,
@@ -159,13 +175,48 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
               className="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none bg-white cursor-pointer"
             >
               <option value="COLABORADOR">
-                Colaborador (Pode criar reservas e clientes; NÃO pode apagar)
+                Colaborador (Cria reservas e clientes; sem acesso a estatística nem gestão do salão)
               </option>
               <option value="ADMIN">
-                Administrador (Controlo total: gere equipa e pode apagar reservas)
+                Administrador (Controlo total: gere equipa, personalização e acede à estatística)
               </option>
             </select>
+            {role === 'ADMIN' && (
+              <p className="text-[11px] text-purple-700 mt-1.5 bg-purple-50 p-2 rounded-lg border border-purple-100 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-purple-600" />
+                <span>Este utilizador terá estatuto de Administrador e poderá gerir o salão.</span>
+              </p>
+            )}
           </div>
+
+          {role === 'ADMIN' && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-purple-600" />
+                Palavra-passe de Administrador
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Predefinida: admin123"
+                  className="w-full text-xs pl-3 pr-9 py-2 border border-purple-200 bg-purple-50/30 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <span className="text-[10px] text-slate-400 mt-1 block">
+                Necessária para aceder à área de estatística e relatórios. Se deixar em branco, será "admin123".
+              </span>
+            </div>
+          )}
 
           {/* Seletor de Cor no Calendário */}
           <div>

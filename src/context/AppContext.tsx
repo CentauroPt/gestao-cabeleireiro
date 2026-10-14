@@ -261,23 +261,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentUser, activeTab]);
 
   const unlockAdmin = (password: string, email?: string): boolean => {
-    const salonAdmin = users.find((u) => u.salonId === currentSalonId && u.role === 'ADMIN');
+    const salonAdmins = users.filter((u) => u.salonId === currentSalonId && u.role === 'ADMIN');
 
-    if (email && salonAdmin?.email && email.trim().toLowerCase() !== salonAdmin.email.toLowerCase()) {
-      showNotification('error', `O e-mail indicado não corresponde ao administrador de ${currentSalon?.name || 'este salão'}.`);
+    if (salonAdmins.length === 0) {
+      showNotification('error', 'Nenhum administrador encontrado para este salão.');
       return false;
     }
 
-    const validPassword = salonAdmin?.password || 'admin123';
+    const cleanInputPw = (password || '').trim();
 
-    if (password === validPassword || password === 'admin123' || password === 'admin') {
+    if (email && email.trim()) {
+      const cleanEmail = email.trim().toLowerCase();
+      const matchedAdmin = salonAdmins.find((u) => (u.email || '').trim().toLowerCase() === cleanEmail);
+      if (!matchedAdmin) {
+        showNotification('error', `O e-mail indicado não corresponde a um administrador registado em ${currentSalon?.name || 'este salão'}.`);
+        return false;
+      }
+      const validPw = (matchedAdmin.password || 'admin123').trim();
+      if (cleanInputPw === validPw || cleanInputPw === 'admin123' || cleanInputPw === 'admin') {
+        setIsAdminUnlocked(true);
+        showNotification('success', `Autenticação efetuada com sucesso (${matchedAdmin.name})!`);
+        return true;
+      } else {
+        showNotification('error', 'Palavra-passe de Administrador incorreta.');
+        return false;
+      }
+    }
+
+    // Se nenhum e-mail foi fornecido, verificar se o currentUser é ADMIN
+    if (currentUser && currentUser.role === 'ADMIN') {
+      const validPw = (currentUser.password || 'admin123').trim();
+      if (cleanInputPw === validPw || cleanInputPw === 'admin123' || cleanInputPw === 'admin') {
+        setIsAdminUnlocked(true);
+        showNotification('success', `Autenticação de Administrador efetuada com sucesso (${currentUser.name})!`);
+        return true;
+      }
+    }
+
+    // Verificar se corresponde à palavra-passe de algum dos administradores do salão
+    const anyMatchingAdmin = salonAdmins.find((u) => {
+      const pw = (u.password || 'admin123').trim();
+      return cleanInputPw === pw || cleanInputPw === 'admin123' || cleanInputPw === 'admin';
+    });
+
+    if (anyMatchingAdmin) {
       setIsAdminUnlocked(true);
-      showNotification('success', 'Autenticação de Administrador efetuada com sucesso!');
+      showNotification('success', `Autenticação de Administrador efetuada com sucesso (${anyMatchingAdmin.name})!`);
       return true;
-    } else {
-      showNotification('error', 'Palavra-passe de Administrador incorreta.');
-      return false;
     }
+
+    showNotification('error', 'Palavra-passe de Administrador incorreta.');
+    return false;
   };
 
   const lockAdmin = () => {

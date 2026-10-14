@@ -65,6 +65,7 @@ interface SalesTransaction {
 export const AdminReportsView: React.FC = () => {
   const {
     currentSalon,
+    currentUser,
     users,
     clients,
     appointments,
@@ -75,8 +76,8 @@ export const AdminReportsView: React.FC = () => {
   } = useApp();
 
   // Estados de Autenticação
-  const salonAdmin = useMemo(() => {
-    return users.find((u) => u.salonId === currentSalon?.id && u.role === 'ADMIN');
+  const salonAdmins = useMemo(() => {
+    return users.filter((u) => u.salonId === currentSalon?.id && u.role === 'ADMIN');
   }, [users, currentSalon]);
 
   const [inputEmail, setInputEmail] = useState('');
@@ -84,6 +85,15 @@ export const AdminReportsView: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
+
+  // Pré-selecionar email do administrador atual se disponível
+  React.useEffect(() => {
+    if (currentUser?.role === 'ADMIN' && currentUser.email && !inputEmail) {
+      setInputEmail(currentUser.email);
+    } else if (!inputEmail && salonAdmins.length === 1 && salonAdmins[0].email) {
+      setInputEmail(salonAdmins[0].email);
+    }
+  }, [currentUser, salonAdmins]);
 
   // Estados dos Relatórios
   const [activeReportTab, setActiveReportTab] = useState<ReportTab>('clients');
@@ -320,23 +330,38 @@ export const AdminReportsView: React.FC = () => {
         </h2>
 
         <p className="text-xs sm:text-sm text-slate-500 mt-2 leading-relaxed">
-          Para visualizar a estatística de <strong>{currentSalon?.name}</strong>, introduza as credenciais do administrador registado.
+          Para visualizar a estatística de <strong>{currentSalon?.name}</strong>, introduza as credenciais de um administrador do salão.
         </p>
 
         <form onSubmit={handleLoginSubmit} autoComplete="off" className="mt-6 text-left space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              E-mail do Administrador
+              Administrador / E-mail
             </label>
-            <input
-              type="email"
-              required
-              autoComplete="off"
-              value={inputEmail}
-              onChange={(e) => setInputEmail(e.target.value)}
-              placeholder="Introduza o e-mail do administrador..."
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
-            />
+            {salonAdmins.length > 1 ? (
+              <select
+                value={inputEmail}
+                onChange={(e) => setInputEmail(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all font-medium cursor-pointer"
+              >
+                <option value="">Selecione o Administrador...</option>
+                {salonAdmins.map((adm) => (
+                  <option key={adm.id} value={adm.email}>
+                    {adm.name} ({adm.email})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="email"
+                required
+                autoComplete="off"
+                value={inputEmail}
+                onChange={(e) => setInputEmail(e.target.value)}
+                placeholder="Introduza o e-mail do administrador..."
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+              />
+            )}
           </div>
 
           <div>
@@ -396,7 +421,7 @@ export const AdminReportsView: React.FC = () => {
             <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-full flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> Sessão de Administrador Ativa
             </span>
-            <span className="text-xs text-slate-400">• {salonAdmin?.name || 'Administrador'}</span>
+            <span className="text-xs text-slate-400">• {currentUser?.name || salonAdmins[0]?.name || 'Administrador'}</span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1 flex items-center gap-2">
             <BarChart3 className="w-6 h-6 text-purple-600" />

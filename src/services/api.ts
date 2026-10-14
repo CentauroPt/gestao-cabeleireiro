@@ -531,9 +531,11 @@ export class ApiService {
     if (currentUserRole !== 'ADMIN') {
       throw new Error('Apenas o Administrador pode registar novos colaboradores.');
     }
+    const cleanPassword = userData.password?.trim() || (userData.role === 'ADMIN' ? 'admin123' : undefined);
     const newUser: User = {
       id: `user-${Date.now()}`,
       ...userData,
+      password: cleanPassword,
       email: userData.email ? userData.email.trim().toLowerCase() : userData.email,
     };
     this.users.push(newUser);
@@ -548,10 +550,30 @@ export class ApiService {
     }
     const index = this.users.findIndex((u) => u.id === id);
     if (index === -1) throw new Error('Colaborador não encontrado.');
+
+    const targetUser = this.users[index];
+
+    // Se estiver a alterar a função de ADMIN para COLABORADOR, assegurar que fica pelo menos um ADMIN no salão
+    if (targetUser.role === 'ADMIN' && data.role === 'COLABORADOR') {
+      const remainingAdmins = this.users.filter(
+        (u) => u.salonId === targetUser.salonId && u.role === 'ADMIN' && u.id !== id
+      );
+      if (remainingAdmins.length === 0) {
+        throw new Error('O salão deve manter pelo menos um Administrador. Promova outro membro antes de despromover este utilizador.');
+      }
+    }
+
+    // Se estiver a promover para ADMIN e não tiver password definida, definir como 'admin123'
+    let updatedPassword = data.password !== undefined ? data.password.trim() : targetUser.password;
+    if (data.role === 'ADMIN' && !updatedPassword) {
+      updatedPassword = 'admin123';
+    }
+
     this.users[index] = {
-      ...this.users[index],
+      ...targetUser,
       ...data,
-      email: data.email ? data.email.trim().toLowerCase() : this.users[index].email,
+      password: updatedPassword,
+      email: data.email ? data.email.trim().toLowerCase() : targetUser.email,
     };
     saveToStorage(STORAGE_KEYS.USERS, this.users);
     return this.users[index];
@@ -562,6 +584,18 @@ export class ApiService {
     if (currentUserRole !== 'ADMIN') {
       throw new Error('Apenas o Administrador pode desativar colaboradores.');
     }
+    const targetUser = this.users.find((u) => u.id === id);
+    if (!targetUser) throw new Error('Colaborador não encontrado.');
+
+    if (targetUser.role === 'ADMIN') {
+      const remainingAdmins = this.users.filter(
+        (u) => u.salonId === targetUser.salonId && u.role === 'ADMIN' && u.id !== id
+      );
+      if (remainingAdmins.length === 0) {
+        throw new Error('Não é possível remover o único Administrador do salão. O salão deve ter pelo menos um Administrador ativo.');
+      }
+    }
+
     this.users = this.users.filter((u) => u.id !== id);
     saveToStorage(STORAGE_KEYS.USERS, this.users);
   }
