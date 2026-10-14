@@ -21,6 +21,8 @@ import {
   RefreshCw,
   Key,
   Calendar,
+  AlertTriangle,
+  Info,
 } from 'lucide-react';
 
 export const DeveloperPortalView: React.FC = () => {
@@ -35,6 +37,8 @@ export const DeveloperPortalView: React.FC = () => {
     changeDeveloperPassword,
     changeSalonPassword,
     resetDemoData,
+    notification,
+    setNotification,
   } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,6 +73,7 @@ export const DeveloperPortalView: React.FC = () => {
   // Modal para alterar palavra-passe do salão
   const [editingSalonPassword, setEditingSalonPassword] = useState<SalonSummary | null>(null);
   const [newSalonPassword, setNewSalonPassword] = useState('');
+  const [showSalonPassword, setShowSalonPassword] = useState(false);
   const [salonPasswordError, setSalonPasswordError] = useState('');
   const [isSavingSalonPassword, setIsSavingSalonPassword] = useState(false);
 
@@ -196,21 +201,56 @@ export const DeveloperPortalView: React.FC = () => {
     e.preventDefault();
     if (!editingSalonPassword) return;
     setSalonPasswordError('');
-    if (!newSalonPassword || newSalonPassword.trim().length < 4) {
-      setSalonPasswordError('A palavra-passe deve ter pelo menos 4 caracteres.');
+    const cleanPw = newSalonPassword.trim();
+    if (!cleanPw || cleanPw.length < 3) {
+      setSalonPasswordError('Por favor introduza uma palavra-passe válida com pelo menos 3 caracteres.');
       return;
     }
     setIsSavingSalonPassword(true);
-    const success = await changeSalonPassword(editingSalonPassword.salon.id, newSalonPassword);
-    setIsSavingSalonPassword(false);
-    if (success) {
-      setEditingSalonPassword(null);
-      setNewSalonPassword('');
+    try {
+      const success = await changeSalonPassword(editingSalonPassword.salon.id, cleanPw);
+      if (success) {
+        setEditingSalonPassword(null);
+        setNewSalonPassword('');
+        setShowSalonPassword(false);
+      } else {
+        setSalonPasswordError('Não foi possível gravar a palavra-passe. Por favor tente novamente.');
+      }
+    } catch (err: any) {
+      setSalonPasswordError(err?.message || 'Erro ao atualizar palavra-passe.');
+    } finally {
+      setIsSavingSalonPassword(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-6 lg:p-8 relative">
+      {/* Notificações no Painel do Programador */}
+      {notification && (
+        <div
+          className={`fixed top-4 right-4 z-50 max-w-md p-4 rounded-2xl shadow-2xl border text-xs font-bold flex items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-200 ${
+            notification.type === 'error'
+              ? 'bg-rose-950/95 border-rose-500/50 text-rose-200'
+              : notification.type === 'success'
+              ? 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200'
+              : 'bg-indigo-950/95 border-indigo-500/50 text-indigo-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {notification.type === 'error' && <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />}
+            {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
+            {notification.type === 'info' && <Info className="w-4 h-4 text-indigo-400 shrink-0" />}
+            <span>{notification.message}</span>
+          </div>
+          <button
+            onClick={() => setNotification(null)}
+            className="text-slate-400 hover:text-white font-black px-1.5 py-0.5 rounded cursor-pointer"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Top Header */}
         <div className="bg-slate-800/90 border border-slate-700 rounded-3xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -533,7 +573,8 @@ export const DeveloperPortalView: React.FC = () => {
                           <button
                             onClick={() => {
                               setEditingSalonPassword(item);
-                              setNewSalonPassword('');
+                              setNewSalonPassword(item.adminUser?.password || '');
+                              setShowSalonPassword(true);
                               setSalonPasswordError('');
                             }}
                             className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-indigo-500/30"
@@ -890,31 +931,44 @@ export const DeveloperPortalView: React.FC = () => {
               {editingSalonPassword.salon.name}
             </p>
             <p className="text-xs text-slate-400 text-center mt-0.5">
-              Administrador: <strong className="text-slate-300">{editingSalonPassword.adminUser?.name || 'Administrador'}</strong> ({editingSalonPassword.adminUser?.email || 'N/A'})
+              Administrador: <strong className="text-slate-300">{editingSalonPassword.adminUser?.name || `Administrador (${editingSalonPassword.salon.name})`}</strong> ({editingSalonPassword.adminUser?.email || editingSalonPassword.salon.phone || 'Sem e-mail registado'})
             </p>
 
-            <form onSubmit={handleChangeSalonPassword} className="mt-4 space-y-3">
+            <form onSubmit={handleChangeSalonPassword} noValidate className="mt-4 space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
                   Nova Palavra-passe para o Salão *
                 </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  placeholder="Introduza a nova palavra-passe (mín. 4 caracteres)..."
-                  value={newSalonPassword}
-                  onChange={(e) => setNewSalonPassword(e.target.value)}
-                  className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
-                />
+                <div className="relative">
+                  <input
+                    type={showSalonPassword ? 'text' : 'password'}
+                    autoFocus
+                    placeholder="Introduza a nova palavra-passe (mín. 3 caracteres)..."
+                    value={newSalonPassword}
+                    onChange={(e) => {
+                      setNewSalonPassword(e.target.value);
+                      if (salonPasswordError) setSalonPasswordError('');
+                    }}
+                    className="w-full pl-3.5 pr-10 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSalonPassword(!showSalonPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 cursor-pointer transition-colors"
+                    title={showSalonPassword ? 'Ocultar palavra-passe' : 'Mostrar palavra-passe'}
+                  >
+                    {showSalonPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
                 <span className="text-[11px] text-slate-400 mt-1.5 block">
                   Esta será a nova credencial para o salão aceder. Pode indicar esta palavra-passe diretamente ao proprietário do salão.
                 </span>
               </div>
 
               {salonPasswordError && (
-                <div className="p-2.5 bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-xs">
-                  {salonPasswordError}
+                <div className="p-2.5 bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-center gap-1.5 animate-in fade-in">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{salonPasswordError}</span>
                 </div>
               )}
 
@@ -929,7 +983,7 @@ export const DeveloperPortalView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSavingSalonPassword}
-                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow-md disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow-md disabled:opacity-50 transition-colors"
                 >
                   {isSavingSalonPassword ? 'A atualizar...' : 'Atualizar Senha'}
                 </button>

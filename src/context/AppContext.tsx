@@ -609,10 +609,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const changeSalonPassword = async (salonId: string, newPassword: string): Promise<boolean> => {
     try {
-      await api.updateSalonAdminPassword(salonId, newPassword);
+      const admin = await api.updateSalonAdminPassword(salonId, newPassword);
       await refreshData();
       await refreshAllSalonsSummary();
-      showNotification('success', 'Palavra-passe do salão atualizada com sucesso!');
+      showNotification('success', `Palavra-passe de "${admin.name}" atualizada com sucesso!`);
       return true;
     } catch (err: any) {
       showNotification('error', err.message || 'Erro ao atualizar palavra-passe do salão.');

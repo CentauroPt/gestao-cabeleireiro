@@ -259,27 +259,56 @@ export class ApiService {
   }
 
   // Alterar a Palavra-passe de um Salão Registado (Função do Programador)
-  async updateSalonAdminPassword(salonId: string, newPassword: string): Promise<void> {
+  async updateSalonAdminPassword(salonId: string, newPassword: string): Promise<User> {
+    await syncAndMergeStorage();
     this.reloadFromStorage();
-    if (!newPassword || newPassword.trim().length < 3) {
+    const cleanPw = (newPassword || '').trim();
+    if (!cleanPw || cleanPw.length < 3) {
       throw new Error('A palavra-passe deve ter pelo menos 3 caracteres.');
     }
 
-    const salonUsers = this.users.filter((u) => u.salonId === salonId);
-    if (salonUsers.length === 0) {
-      throw new Error('Não foram encontrados utilizadores registados neste salão.');
+    const salon = this.salons.find((s) => s.id === salonId);
+    if (!salon) {
+      throw new Error('Salão não encontrado.');
     }
 
-    const admins = salonUsers.filter((u) => u.role === 'ADMIN');
-    if (admins.length > 0) {
-      admins.forEach((adm) => {
-        adm.password = newPassword.trim();
-      });
+    let salonUsers = this.users.filter((u) => u.salonId === salonId);
+    let targetAdmin: User;
+
+    if (salonUsers.length === 0) {
+      // Criar automaticamente o Administrador caso o salão ainda não tenha nenhum utilizador
+      const cleanSlug = salon.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      targetAdmin = {
+        id: `user-${Date.now()}`,
+        salonId: salon.id,
+        name: `Administrador ${salon.name}`,
+        email: `admin@${cleanSlug || 'salao'}.pt`,
+        phone: salon.phone || '',
+        role: 'ADMIN',
+        password: cleanPw,
+        color: salon.primaryColor || '#8B5CF6',
+        specialties: ['Gestão', 'Administração'],
+        active: true,
+      };
+      this.users.push(targetAdmin);
     } else {
-      salonUsers[0].password = newPassword.trim();
+      const admins = salonUsers.filter((u) => u.role === 'ADMIN');
+      if (admins.length > 0) {
+        admins.forEach((adm) => {
+          adm.password = cleanPw;
+          adm.active = true;
+        });
+        targetAdmin = admins[0];
+      } else {
+        salonUsers[0].role = 'ADMIN';
+        salonUsers[0].password = cleanPw;
+        salonUsers[0].active = true;
+        targetAdmin = salonUsers[0];
+      }
     }
 
     saveToStorage(STORAGE_KEYS.USERS, this.users);
+    return targetAdmin;
   }
 
   // Resumo de todos os salões para a Consola do Programador
@@ -289,13 +318,16 @@ export class ApiService {
       const salonUsers = this.users.filter((u) => u.salonId === salon.id);
       const salonClients = this.clients.filter((c) => c.salonId === salon.id);
       const salonAppointments = this.appointments.filter((a) => a.salonId === salon.id);
-      const adminUser = salonUsers.find((u) => u.role === 'ADMIN');
+      let adminUser = salonUsers.find((u) => u.role === 'ADMIN');
+      if (!adminUser && salonUsers.length > 0) {
+        adminUser = salonUsers[0];
+      }
 
       const revenueFromClients = salonClients.reduce((acc, c) => acc + (c.totalSpent || 0), 0);
 
       return {
         salon,
-        adminUser,
+        adminUser: adminUser || undefined,
         staffCount: salonUsers.length,
         clientsCount: salonClients.length,
         appointmentsCount: salonAppointments.length,
