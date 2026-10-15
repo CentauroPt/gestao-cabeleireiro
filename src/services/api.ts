@@ -3,6 +3,7 @@ import {
   STORAGE_KEYS,
   loadFromLocalStorage,
   saveToStorage,
+  saveMultipleToStorage,
   syncAndMergeStorage,
   onStorageSync,
 } from './storageEngine';
@@ -189,9 +190,11 @@ export class ApiService {
     this.users.push(adminUser);
     this.services.push(...initialServices);
 
-    saveToStorage(STORAGE_KEYS.SALONS, this.salons);
-    saveToStorage(STORAGE_KEYS.USERS, this.users);
-    saveToStorage(STORAGE_KEYS.SERVICES, this.services);
+    saveMultipleToStorage([
+      { key: STORAGE_KEYS.SALONS, data: this.salons },
+      { key: STORAGE_KEYS.USERS, data: this.users },
+      { key: STORAGE_KEYS.SERVICES, data: this.services },
+    ]);
 
     return { salon: newSalon, adminUser };
   }
@@ -220,11 +223,13 @@ export class ApiService {
     this.clients = this.clients.filter((c) => c.salonId !== salonId);
     this.appointments = this.appointments.filter((a) => a.salonId !== salonId);
 
-    saveToStorage(STORAGE_KEYS.SALONS, this.salons);
-    saveToStorage(STORAGE_KEYS.USERS, this.users);
-    saveToStorage(STORAGE_KEYS.SERVICES, this.services);
-    saveToStorage(STORAGE_KEYS.CLIENTS, this.clients);
-    saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
+    saveMultipleToStorage([
+      { key: STORAGE_KEYS.SALONS, data: this.salons },
+      { key: STORAGE_KEYS.USERS, data: this.users },
+      { key: STORAGE_KEYS.SERVICES, data: this.services },
+      { key: STORAGE_KEYS.CLIENTS, data: this.clients },
+      { key: STORAGE_KEYS.APPOINTMENTS, data: this.appointments },
+    ]);
   }
 
   // Gestão da Palavra-passe do Programador
@@ -502,7 +507,30 @@ export class ApiService {
   // ================= UTILIZADORES / COLABORADORES =================
   async getUsers(salonId: string): Promise<User[]> {
     this.reloadFromStorage();
-    return this.users.filter((u) => u.salonId === salonId);
+    let salonUsers = this.users.filter((u) => u.salonId === salonId);
+    if (salonUsers.length === 0) {
+      const salon = this.salons.find((s) => s.id === salonId);
+      if (salon) {
+        // Auto-recuperação: Se o salão ficou sem utilizador administrador, recriar o Administrador
+        const cleanSlug = salon.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const autoAdmin: User = {
+          id: `user-${Date.now()}`,
+          salonId: salon.id,
+          name: `Administrador ${salon.name}`,
+          email: `admin@${cleanSlug || 'salao'}.pt`,
+          phone: salon.phone || '',
+          role: 'ADMIN',
+          password: '',
+          color: salon.primaryColor || '#8B5CF6',
+          specialties: ['Gestão', 'Administração'],
+          active: true,
+        };
+        this.users.push(autoAdmin);
+        saveToStorage(STORAGE_KEYS.USERS, this.users);
+        salonUsers = [autoAdmin];
+      }
+    }
+    return salonUsers;
   }
 
   async createUser(currentUserRole: string, userData: Omit<User, 'id'>): Promise<User> {
@@ -578,7 +606,36 @@ export class ApiService {
   // ================= SERVIÇOS =================
   async getServices(salonId: string): Promise<Service[]> {
     this.reloadFromStorage();
-    return this.services.filter((s) => s.salonId === salonId);
+    let salonServices = this.services.filter((s) => s.salonId === salonId);
+    if (salonServices.length === 0) {
+      const salon = this.salons.find((s) => s.id === salonId);
+      if (salon) {
+        // Criar serviços base se o salão não tiver nenhum
+        const baseServices: Service[] = [
+          {
+            id: `serv-${Date.now()}-1`,
+            salonId,
+            name: 'Corte de Cabelo',
+            category: 'Cabelo',
+            durationMinutes: 30,
+            price: 20.0,
+            description: 'Corte e finalização personalizada.',
+          },
+          {
+            id: `serv-${Date.now()}-2`,
+            salonId,
+            name: 'Brushing & Lavagem',
+            category: 'Cabelo',
+            durationMinutes: 30,
+            price: 18.0,
+          },
+        ];
+        this.services.push(...baseServices);
+        saveToStorage(STORAGE_KEYS.SERVICES, this.services);
+        salonServices = baseServices;
+      }
+    }
+    return salonServices;
   }
 
   async createService(_currentUserRole: string, serviceData: Omit<Service, 'id'>): Promise<Service> {
@@ -738,11 +795,13 @@ export class ApiService {
     this.services = [];
     this.clients = [];
     this.appointments = [];
-    saveToStorage(STORAGE_KEYS.SALONS, []);
-    saveToStorage(STORAGE_KEYS.USERS, []);
-    saveToStorage(STORAGE_KEYS.SERVICES, []);
-    saveToStorage(STORAGE_KEYS.CLIENTS, []);
-    saveToStorage(STORAGE_KEYS.APPOINTMENTS, []);
+    saveMultipleToStorage([
+      { key: STORAGE_KEYS.SALONS, data: [] },
+      { key: STORAGE_KEYS.USERS, data: [] },
+      { key: STORAGE_KEYS.SERVICES, data: [] },
+      { key: STORAGE_KEYS.CLIENTS, data: [] },
+      { key: STORAGE_KEYS.APPOINTMENTS, data: [] },
+    ]);
   }
 }
 

@@ -37,14 +37,19 @@ export function onStorageSync(listener: StorageSyncListener): () => void {
   };
 }
 
+let syncTimeout: any = null;
 export function notifyStorageSync(): void {
-  listeners.forEach((fn) => {
-    try {
-      fn();
-    } catch (e) {
-      console.error('Erro ao notificar listener de storage:', e);
-    }
-  });
+  if (syncTimeout) clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => {
+    syncTimeout = null;
+    listeners.forEach((fn) => {
+      try {
+        fn();
+      } catch (e) {
+        console.error('Erro ao notificar listener de storage:', e);
+      }
+    });
+  }, 40);
 }
 
 function openIndexedDB(): Promise<IDBDatabase | null> {
@@ -173,6 +178,21 @@ export function saveToStorage<T>(key: string, data: T[]): void {
 
   // 2. Gravar no IndexedDB de forma resiliente e permanente
   idbSet(key, data).catch((e) => console.error(`Erro ao sincronizar ${key} com IndexedDB:`, e));
+  notifyStorageSync();
+}
+
+/**
+ * Grava múltiplos conjuntos de dados no armazenamento de forma atómica
+ */
+export function saveMultipleToStorage(entries: Array<{ key: string; data: any[] }>): void {
+  for (const entry of entries) {
+    try {
+      localStorage.setItem(entry.key, JSON.stringify(entry.data));
+    } catch (err: any) {
+      console.warn(`Aviso ao gravar ${entry.key}:`, err);
+    }
+    idbSet(entry.key, entry.data).catch((e) => console.error(`Erro ao sincronizar ${entry.key}:`, e));
+  }
   notifyStorageSync();
 }
 

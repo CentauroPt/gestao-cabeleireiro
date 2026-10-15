@@ -190,16 +190,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const refreshData = async () => {
+  const refreshData = async (targetSalonId?: string, targetUserId?: string) => {
     try {
       setLoading(true);
       const allSalons = await api.getSalons();
       setSalons(allSalons);
 
-      const activeSalon = allSalons.find((s) => s.id === currentSalonId) || allSalons[0];
+      const effectiveSalonId = targetSalonId || currentSalonId;
+      const activeSalon = allSalons.find((s) => s.id === effectiveSalonId) || allSalons[0];
       if (activeSalon) {
         const salonId = activeSalon.id;
-        if (!currentSalonId) {
+        if (currentSalonId !== salonId) {
           setCurrentSalonIdState(salonId);
         }
         const [salonUsers, salonServices, salonClients, salonAppointments] = await Promise.all([
@@ -213,9 +214,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setClients(salonClients);
         setAppointments(salonAppointments);
 
-        // Se o utilizador atual não pertencer a este salão, seleciona o primeiro
-        if (!salonUsers.some((u) => u.id === currentUserId) && salonUsers.length > 0) {
-          setCurrentUserId(salonUsers[0].id);
+        const effectiveUserId = targetUserId || currentUserId;
+        const matchedUser = salonUsers.find((u) => u.id === effectiveUserId);
+        if (matchedUser) {
+          if (currentUserId !== matchedUser.id) {
+            setCurrentUserIdState(matchedUser.id);
+          }
+        } else if (salonUsers.length > 0) {
+          const adminFirst = salonUsers.find((u) => u.role === 'ADMIN') || salonUsers[0];
+          setCurrentUserIdState(adminFirst.id);
         }
       } else {
         setUsers([]);
@@ -253,8 +260,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [salons, currentSalonId]);
 
   const currentUser = useMemo(() => {
-    return users.find((u) => u.id === currentUserId) || null;
+    const found = users.find((u) => u.id === currentUserId);
+    if (found) return found;
+    if (users.length > 0) {
+      return users.find((u) => u.role === 'ADMIN') || users[0];
+    }
+    return null;
   }, [users, currentUserId]);
+
+  useEffect(() => {
+    if (currentUser && currentUserId !== currentUser.id) {
+      setCurrentUserIdState(currentUser.id);
+    }
+  }, [currentUser, currentUserId]);
 
   const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(false);
 
@@ -597,7 +615,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsImpersonating(false);
       setAppMode('salon');
       saveActiveSession({ appMode: 'salon', salonId: salon.id, userId: user.id });
-      await refreshData();
+      await refreshData(salon.id, user.id);
       showNotification('success', `Sessão iniciada no salão "${salon.name}".`);
       return { success: true };
     } catch (err: any) {
@@ -707,11 +725,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const impersonateSalon = (salonId: string) => {
+  const impersonateSalon = async (salonId: string) => {
     setCurrentSalonId(salonId);
     setIsImpersonating(true);
     setAppMode('salon');
-    refreshData();
+    await refreshData(salonId);
     showNotification('info', 'A inspecionar salão no modo de programador.');
   };
 
@@ -741,16 +759,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ): Promise<boolean> => {
     try {
       const { salon, adminUser } = await api.registerSalon(params);
-      await refreshData();
-      await refreshAllSalonsSummary();
 
       if (!options?.stayInCurrentMode && appMode !== 'developer') {
         setCurrentSalonIdState(salon.id);
         setCurrentUserIdState(adminUser.id);
         setAppMode('salon');
         saveActiveSession({ appMode: 'salon', salonId: salon.id, userId: adminUser.id });
-        showNotification('success', `Salão "${salon.name}" registado com sucesso! Acedendo à agenda...`);
+        await refreshData(salon.id, adminUser.id);
+        await refreshAllSalonsSummary();
+        showNotification('success', `Salão "${salon.name}" registado com sucesso! Acedendo como ${adminUser.name}...`);
       } else {
+        await refreshData();
+        await refreshAllSalonsSummary();
         showNotification('success', `Salão "${salon.name}" registado com sucesso no sistema!`);
       }
       return true;
@@ -796,9 +816,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     technicalNotes?: string;
     photoUrl?: string;
   }): Promise<boolean> => {
-    if (!currentSalon || !currentUser) return false;
+    if (!currentSalon) {
+      showNotification('error', 'Nenhum salão selecionado.');
+      return false;
+    }
 
     try {
+      const creatorId = currentUser?.id || users[0]?.id || 'admin';
       await api.createClient({
         salonId: currentSalon.id,
         name: data.name,
@@ -807,7 +831,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         preferredUserId: data.preferredUserId,
         technicalNotes: data.technicalNotes,
         photoUrl: data.photoUrl,
-        createdById: currentUser.id,
+        createdById: creatorId,
       });
       await refreshData();
       showNotification('success', 'Cliente registado com sucesso!');
@@ -906,10 +930,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ================= AÇÕES DE SERVIÇOS =================
   const addService = async (data: Omit<Service, 'id' | 'salonId'>): Promise<boolean> => {
-    if (!currentSalon || !currentUser) return false;
+    if (!currentSalon) {
+      showNotification('error', 'Nenhum salão selecionado.');
+      return false;
+    }
 
     try {
-      await api.createService(currentUser.role, {
+      const role = currentUser?.role || 'ADMIN';
+      await api.createService(role, {
         ...data,
         salonId: currentSalon.id,
       });
