@@ -56,7 +56,7 @@ export const DeveloperPortalView: React.FC = () => {
   const [newSalonNif, setNewSalonNif] = useState('');
   const [newSalonAdminName, setNewSalonAdminName] = useState('');
   const [newSalonAdminEmail, setNewSalonAdminEmail] = useState('');
-  const [newSalonAdminPassword, setNewSalonAdminPassword] = useState('admin123');
+  const [newSalonAdminPassword, setNewSalonAdminPassword] = useState('');
   const [showNewSalonPassword, setShowNewSalonPassword] = useState(false);
   const [createdSalonCredentials, setCreatedSalonCredentials] = useState<{
     salonName: string;
@@ -164,9 +164,12 @@ export const DeveloperPortalView: React.FC = () => {
   // Criar Salão pelo Programador
   const handleCreateSalonSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSalonName || !newSalonPhone || !newSalonAdminName || !newSalonAdminEmail) return;
+    if (!newSalonName || !newSalonPhone || !newSalonAdminName || !newSalonAdminEmail || !newSalonAdminPassword.trim()) {
+      alert('Por favor preencha todos os campos obrigatórios, incluindo a palavra-passe do administrador.');
+      return;
+    }
 
-    const chosenPassword = newSalonAdminPassword.trim() || 'admin123';
+    const chosenPassword = newSalonAdminPassword.trim();
     const ok = await registerNewSalon(
       {
         name: newSalonName.trim(),
@@ -193,7 +196,7 @@ export const DeveloperPortalView: React.FC = () => {
       setNewSalonNif('');
       setNewSalonAdminName('');
       setNewSalonAdminEmail('');
-      setNewSalonAdminPassword('admin123');
+      setNewSalonAdminPassword('');
     }
   };
 
@@ -332,7 +335,7 @@ export const DeveloperPortalView: React.FC = () => {
               onClick={() => {
                 if (
                   confirm(
-                    'ATENÇÃO: Deseja repor os dados de demonstração de fábrica? Todos os novos salões registados serão eliminados permanentemente.'
+                    'ATENÇÃO: Deseja limpar a base de dados local? Todos os dados guardados em cache local serão limpos.'
                   )
                 ) {
                   resetDemoData();
@@ -340,10 +343,10 @@ export const DeveloperPortalView: React.FC = () => {
                 }
               }}
               className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Repor dados de fábrica (Apenas para testes)"
+              title="Limpar dados locais do sistema"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Repor Demonstração</span>
+              <span>Limpar Dados</span>
             </button>
 
             <button
@@ -528,7 +531,7 @@ export const DeveloperPortalView: React.FC = () => {
                             </div>
                             <div className="text-[10px] text-purple-300 font-mono mt-0.5 flex items-center gap-1">
                               <Key className="w-2.5 h-2.5 text-purple-400" />
-                              <span>Senha: <strong>{item.adminUser.password || 'admin123'}</strong></span>
+                              <span>Senha: <strong>{item.adminUser.password ? '••••••••' : 'Não definida'}</strong></span>
                             </div>
                           </div>
                         ) : (
@@ -803,7 +806,7 @@ export const DeveloperPortalView: React.FC = () => {
                   </button>
                 </div>
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  Palavra-passe de acesso a este salão (padrão: <code className="text-purple-300 bg-slate-800 px-1 py-0.5 rounded">admin123</code>).
+                  Defina a palavra-passe de acesso inicial para o administrador deste salão.
                 </span>
               </div>
 

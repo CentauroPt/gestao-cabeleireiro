@@ -27,7 +27,7 @@ export const StaffList: React.FC = () => {
 
   // Estados para Modal Rápida de Promoção a Administrador
   const [userToPromote, setUserToPromote] = useState<User | null>(null);
-  const [promotePassword, setPromotePassword] = useState('admin123');
+  const [promotePassword, setPromotePassword] = useState('');
   const [showPromotePassword, setShowPromotePassword] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
 
@@ -38,18 +38,22 @@ export const StaffList: React.FC = () => {
 
   const handleOpenPromote = (user: User) => {
     setUserToPromote(user);
-    setPromotePassword(user.password || 'admin123');
+    setPromotePassword(user.password || '');
     setShowPromotePassword(false);
   };
 
   const handleConfirmPromote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userToPromote) return;
+    if (!promotePassword.trim()) {
+      alert('Por favor introduza uma palavra-passe para o administrador.');
+      return;
+    }
 
     setIsPromoting(true);
     await updateUser(userToPromote.id, {
       role: 'ADMIN',
-      password: promotePassword.trim() || 'admin123',
+      password: promotePassword.trim(),
     });
     setIsPromoting(false);
     setUserToPromote(null);
@@ -394,7 +398,7 @@ export const StaffList: React.FC = () => {
                     required
                     value={promotePassword}
                     onChange={(e) => setPromotePassword(e.target.value)}
-                    placeholder="Ex: admin123"
+                    placeholder="Introduza a palavra-passe..."
                     className="w-full text-xs pl-3.5 pr-10 py-2.5 border border-purple-200 bg-purple-50/30 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
                   />
                   <button
@@ -407,7 +411,7 @@ export const StaffList: React.FC = () => {
                   </button>
                 </div>
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  Utilizada para desbloquear a estatística e gerir o salão. (Padrão: admin123)
+                  Utilizada para desbloquear a estatística e gerir o salão.
                 </span>
               </div>
 

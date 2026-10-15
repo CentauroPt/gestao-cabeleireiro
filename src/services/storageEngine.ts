@@ -126,9 +126,22 @@ export function loadFromLocalStorage<T>(key: string, fallback: T[]): T[] {
   try {
     const raw = localStorage.getItem(key);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      let parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        // Remover utilizadores de demonstração legados caso existam no armazenamento do browser
+        if (key === STORAGE_KEYS.USERS) {
+          const legacyUserIds = ['user-admin', 'user-colab-1', 'user-colab-2', 'user-admin-salon2', 'user-admin-salon3'];
+          const legacyEmails = ['helena@atelierbeleza.pt', 'tiago@atelierbeleza.pt', 'rita@atelierbeleza.pt', 'marta@glamourchic.pt', 'carla@visualglow.pt'];
+          parsed = parsed.filter((u: any) => !legacyUserIds.includes(u?.id) && !legacyEmails.includes(u?.email));
+        }
+        // Remover salões de demonstração legados caso existam
+        if (key === STORAGE_KEYS.SALONS) {
+          const legacySalonIds = ['salon-1', 'salon-2', 'salon-3'];
+          parsed = parsed.filter((s: any) => !legacySalonIds.includes(s?.id));
+        }
+        if (parsed.length > 0) {
+          return parsed;
+        }
       }
     }
   } catch (e) {

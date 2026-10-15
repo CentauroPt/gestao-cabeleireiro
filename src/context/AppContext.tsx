@@ -151,9 +151,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [allSalonsSummary, setAllSalonsSummary] = useState<SalonSummary[]>([]);
 
   const [salons, setSalons] = useState<Salon[]>([]);
-  const [currentSalonId, setCurrentSalonIdState] = useState<string>(initialSession?.salonId || 'salon-1');
+  const [currentSalonId, setCurrentSalonIdState] = useState<string>(initialSession?.salonId || '');
   const [users, setUsers] = useState<User[]>([]);
-  const [currentUserId, setCurrentUserIdState] = useState<string>(initialSession?.userId || 'user-admin');
+  const [currentUserId, setCurrentUserIdState] = useState<string>(initialSession?.userId || '');
   const [services, setServices] = useState<Service[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -199,6 +199,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const activeSalon = allSalons.find((s) => s.id === currentSalonId) || allSalons[0];
       if (activeSalon) {
         const salonId = activeSalon.id;
+        if (!currentSalonId) {
+          setCurrentSalonIdState(salonId);
+        }
         const [salonUsers, salonServices, salonClients, salonAppointments] = await Promise.all([
           api.getUsers(salonId),
           api.getServices(salonId),
@@ -214,6 +217,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!salonUsers.some((u) => u.id === currentUserId) && salonUsers.length > 0) {
           setCurrentUserId(salonUsers[0].id);
         }
+      } else {
+        setUsers([]);
+        setServices([]);
+        setClients([]);
+        setAppointments([]);
       }
     } catch (err: any) {
       showNotification('error', err.message || 'Erro ao carregar dados.');
@@ -277,8 +285,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         showNotification('error', `O e-mail indicado não corresponde a um administrador registado em ${currentSalon?.name || 'este salão'}.`);
         return false;
       }
-      const validPw = (matchedAdmin.password || 'admin123').trim();
-      if (cleanInputPw === validPw || cleanInputPw === 'admin123' || cleanInputPw === 'admin') {
+      const validPw = (matchedAdmin.password || '').trim();
+      if (validPw && cleanInputPw === validPw) {
         setIsAdminUnlocked(true);
         showNotification('success', `Autenticação efetuada com sucesso (${matchedAdmin.name})!`);
         return true;
@@ -290,8 +298,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Se nenhum e-mail foi fornecido, verificar se o currentUser é ADMIN
     if (currentUser && currentUser.role === 'ADMIN') {
-      const validPw = (currentUser.password || 'admin123').trim();
-      if (cleanInputPw === validPw || cleanInputPw === 'admin123' || cleanInputPw === 'admin') {
+      const validPw = (currentUser.password || '').trim();
+      if (validPw && cleanInputPw === validPw) {
         setIsAdminUnlocked(true);
         showNotification('success', `Autenticação de Administrador efetuada com sucesso (${currentUser.name})!`);
         return true;
@@ -300,8 +308,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Verificar se corresponde à palavra-passe de algum dos administradores do salão
     const anyMatchingAdmin = salonAdmins.find((u) => {
-      const pw = (u.password || 'admin123').trim();
-      return cleanInputPw === pw || cleanInputPw === 'admin123' || cleanInputPw === 'admin';
+      const pw = (u.password || '').trim();
+      return pw && cleanInputPw === pw;
     });
 
     if (anyMatchingAdmin) {
@@ -610,14 +618,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loginDeveloper = (password?: string): boolean => {
     const currentDevPassword = api.getDeveloperPassword();
     const trimmed = password?.trim() || '';
-    const encoded = typeof btoa === 'function' ? btoa(trimmed.toLowerCase()) : '';
-    if (
-      trimmed &&
-      (trimmed === currentDevPassword ||
-        trimmed === 'dev123' ||
-        encoded === 'Y2VudGF1cm8yMDI2' ||
-        encoded === 'Y2VudGF1cm8=')
-    ) {
+
+    // Se ainda não foi definida palavra-passe de programador no sistema, configurar na primeira entrada
+    if (!currentDevPassword) {
+      if (trimmed.length >= 4) {
+        api.updateDeveloperPassword(trimmed);
+        setIsDevLoggedIn(true);
+        setAppMode('developer');
+        saveActiveSession({ appMode: 'developer', salonId: currentSalonId, userId: currentUserId });
+        refreshAllSalonsSummary();
+        showNotification('success', 'Palavra-passe de programador configurada com sucesso! Acesso autorizado.');
+        return true;
+      } else {
+        showNotification('error', 'Defina uma palavra-passe de programador (mínimo 4 caracteres).');
+        return false;
+      }
+    }
+
+    if (trimmed && trimmed === currentDevPassword) {
       setIsDevLoggedIn(true);
       setAppMode('developer');
       saveActiveSession({ appMode: 'developer', salonId: currentSalonId, userId: currentUserId });

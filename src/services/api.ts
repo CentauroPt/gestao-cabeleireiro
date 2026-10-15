@@ -1,5 +1,4 @@
 import type { Salon, SalonStatus, User, Service, Client, Appointment } from '../types';
-import { mockSalons, mockUsers, mockServices, mockClients, mockAppointments } from '../data/mockData';
 import {
   STORAGE_KEYS,
   loadFromLocalStorage,
@@ -48,30 +47,18 @@ export class ApiService {
    * para assegurar que múltiplas abas ou sessões nunca usem cache desatualizada.
    */
   public reloadFromStorage(): void {
-    this.salons = loadFromLocalStorage(STORAGE_KEYS.SALONS, mockSalons).map((s) => {
-      const mockMatch = mockSalons.find((m) => m.id === s.id);
-      return {
-        ...s,
-        status: s.status || 'ATIVO',
-        primaryColor: s.primaryColor || mockMatch?.primaryColor || '#8B5CF6',
-        logoUrl: s.logoUrl || mockMatch?.logoUrl,
-        createdAt: s.createdAt || mockMatch?.createdAt || new Date().toISOString(),
-        startDayOfWeek: s.startDayOfWeek !== undefined ? s.startDayOfWeek : (mockMatch?.startDayOfWeek ?? 1),
-      };
-    });
+    this.salons = loadFromLocalStorage<Salon>(STORAGE_KEYS.SALONS, []).map((s) => ({
+      ...s,
+      status: s.status || 'ATIVO',
+      primaryColor: s.primaryColor || '#8B5CF6',
+      createdAt: s.createdAt || new Date().toISOString(),
+      startDayOfWeek: s.startDayOfWeek !== undefined ? s.startDayOfWeek : 1,
+    }));
 
-    this.users = loadFromLocalStorage(STORAGE_KEYS.USERS, mockUsers);
-    this.services = loadFromLocalStorage(STORAGE_KEYS.SERVICES, mockServices);
-
-    this.clients = loadFromLocalStorage(STORAGE_KEYS.CLIENTS, mockClients).map((c) => {
-      const mockMatch = mockClients.find((m) => m.id === c.id);
-      return {
-        ...c,
-        photoUrl: c.photoUrl || mockMatch?.photoUrl,
-      };
-    });
-
-    this.appointments = loadFromLocalStorage(STORAGE_KEYS.APPOINTMENTS, mockAppointments);
+    this.users = loadFromLocalStorage<User>(STORAGE_KEYS.USERS, []);
+    this.services = loadFromLocalStorage<Service>(STORAGE_KEYS.SERVICES, []);
+    this.clients = loadFromLocalStorage<Client>(STORAGE_KEYS.CLIENTS, []);
+    this.appointments = loadFromLocalStorage<Appointment>(STORAGE_KEYS.APPOINTMENTS, []);
   }
 
   getBaseUrl(): string {
@@ -163,7 +150,7 @@ export class ApiService {
       email: cleanEmail,
       phone: params.phone.trim(),
       role: 'ADMIN',
-      password: (params.adminPassword || 'admin123').trim(),
+      password: params.adminPassword?.trim() || undefined,
       color: '#8B5CF6',
       specialties: ['Gestão', 'Cortes & Estilo'],
       active: true,
@@ -241,14 +228,14 @@ export class ApiService {
   }
 
   // Gestão da Palavra-passe do Programador
-  getDeveloperPassword(): string {
+  getDeveloperPassword(): string | null {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.DEV_PASSWORD);
-      if (saved) return saved;
+      if (saved && saved.trim()) return saved.trim();
     } catch (e) {
       console.error('Erro ao ler palavra-passe de programador:', e);
     }
-    return 'admin2026';
+    return null;
   }
 
   updateDeveloperPassword(newPassword: string): void {
@@ -489,21 +476,12 @@ export class ApiService {
 
     const userPassword = (user.password || '').trim();
     const devPassword = this.getDeveloperPassword();
-    const isMasterPassword =
-      inputPassword === devPassword ||
-      inputPassword === 'centauro2026' ||
-      inputPassword === 'centauro' ||
-      inputPassword === 'dev123';
+    const isMasterPassword = Boolean(devPassword && inputPassword === devPassword);
 
-    if (
-      inputPassword &&
-      userPassword &&
-      userPassword !== inputPassword &&
-      inputPassword !== 'admin123' &&
-      inputPassword !== 'admin' &&
-      !isMasterPassword
-    ) {
-      throw new Error(`Palavra-passe incorreta para ${salon.name}. Por favor verifique a palavra-passe introduzida.`);
+    if (userPassword) {
+      if (inputPassword !== userPassword && !isMasterPassword) {
+        throw new Error(`Palavra-passe incorreta para ${salon.name}. Por favor verifique a palavra-passe introduzida.`);
+      }
     }
 
     if (salon.status === 'SUSPENSO') {
@@ -532,7 +510,7 @@ export class ApiService {
     if (currentUserRole !== 'ADMIN') {
       throw new Error('Apenas o Administrador pode registar novos colaboradores.');
     }
-    const cleanPassword = userData.password?.trim() || (userData.role === 'ADMIN' ? 'admin123' : undefined);
+    const cleanPassword = userData.password ? userData.password.trim() : undefined;
     const newUser: User = {
       id: `user-${Date.now()}`,
       ...userData,
@@ -564,11 +542,7 @@ export class ApiService {
       }
     }
 
-    // Se estiver a promover para ADMIN e não tiver password definida, definir como 'admin123'
-    let updatedPassword = data.password !== undefined ? data.password.trim() : targetUser.password;
-    if (data.role === 'ADMIN' && !updatedPassword) {
-      updatedPassword = 'admin123';
-    }
+    const updatedPassword = data.password !== undefined ? data.password.trim() : targetUser.password;
 
     this.users[index] = {
       ...targetUser,
@@ -759,16 +733,16 @@ export class ApiService {
     localStorage.removeItem(STORAGE_KEYS.SERVICES);
     localStorage.removeItem(STORAGE_KEYS.CLIENTS);
     localStorage.removeItem(STORAGE_KEYS.APPOINTMENTS);
-    this.salons = [...mockSalons];
-    this.users = [...mockUsers];
-    this.services = [...mockServices];
-    this.clients = [...mockClients];
-    this.appointments = [...mockAppointments];
-    saveToStorage(STORAGE_KEYS.SALONS, this.salons);
-    saveToStorage(STORAGE_KEYS.USERS, this.users);
-    saveToStorage(STORAGE_KEYS.SERVICES, this.services);
-    saveToStorage(STORAGE_KEYS.CLIENTS, this.clients);
-    saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
+    this.salons = [];
+    this.users = [];
+    this.services = [];
+    this.clients = [];
+    this.appointments = [];
+    saveToStorage(STORAGE_KEYS.SALONS, []);
+    saveToStorage(STORAGE_KEYS.USERS, []);
+    saveToStorage(STORAGE_KEYS.SERVICES, []);
+    saveToStorage(STORAGE_KEYS.CLIENTS, []);
+    saveToStorage(STORAGE_KEYS.APPOINTMENTS, []);
   }
 }
 

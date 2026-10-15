@@ -62,10 +62,15 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
       .map((s) => s.trim())
       .filter(Boolean);
 
+    if (role === 'ADMIN' && !initialUser?.password && !password.trim()) {
+      setError('Por favor defina uma palavra-passe para o Administrador.');
+      return;
+    }
+
+    const adminPassword = role === 'ADMIN' ? (password.trim() || initialUser?.password) : undefined;
+
     setIsSubmitting(true);
     let success = false;
-
-    const adminPassword = role === 'ADMIN' ? (password.trim() || initialUser?.password || 'admin123') : undefined;
 
     if (initialUser) {
       success = await updateUser(initialUser.id, {
@@ -128,7 +133,7 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Rita Ferreira"
+              placeholder="Ex: Nome do Colaborador"
               className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
             />
           </div>
@@ -200,7 +205,7 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Predefinida: admin123"
+                  placeholder={initialUser?.password ? 'Manter palavra-passe atual ou definir nova' : 'Introduza a palavra-passe'}
                   className="w-full text-xs pl-3 pr-9 py-2 border border-purple-200 bg-purple-50/30 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
                 />
                 <button
@@ -213,7 +218,7 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
                 </button>
               </div>
               <span className="text-[10px] text-slate-400 mt-1 block">
-                Necessária para aceder à área de estatística e relatórios. Se deixar em branco, será "admin123".
+                Necessária para aceder à área de estatística e relatórios.
               </span>
             </div>
           )}

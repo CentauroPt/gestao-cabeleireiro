@@ -55,7 +55,7 @@ export const LandingPage: React.FC = () => {
     const cleanAdminName = regAdminName.trim();
     const cleanPhone = regPhone.trim();
 
-    if (!cleanSalonName || !cleanPhone || !cleanAdminName || !cleanEmail) return;
+    if (!cleanSalonName || !cleanPhone || !cleanAdminName || !cleanEmail || !regAdminPassword.trim()) return;
 
     setIsRegistering(true);
     const ok = await registerNewSalon({
@@ -65,7 +65,7 @@ export const LandingPage: React.FC = () => {
       nif: regNif.trim(),
       adminName: cleanAdminName,
       adminEmail: cleanEmail,
-      adminPassword: regAdminPassword.trim() || 'admin123',
+      adminPassword: regAdminPassword.trim(),
       openingTime: regOpeningTime,
       closingTime: regClosingTime,
     });
@@ -370,7 +370,7 @@ export const LandingPage: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="ex: helena@atelierbeleza.pt, Nome do Salão ou 912345678"
+                    placeholder="ex: contacto@salao.pt, Nome do Salão ou 912345678"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
@@ -400,7 +400,7 @@ export const LandingPage: React.FC = () => {
                     </button>
                   </div>
                   <span className="text-[11px] text-slate-500 mt-1.5 block">
-                    Nota: novos salões criados na consola têm palavra-passe predefinida <code className="text-purple-700 bg-purple-50 px-1 py-0.5 rounded font-mono font-bold">admin123</code>.
+                    Introduza a palavra-passe definida no registo do salão ou atribuída ao seu utilizador.
                   </span>
                 </div>
               </div>
