@@ -29,17 +29,17 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
       badge: null,
     },
     {
+      id: 'services' as TabType,
+      label: 'Catálogo de Serviços',
+      icon: <Scissors className="w-5 h-5" />,
+      badge: null,
+    },
+    {
       id: 'clients' as TabType,
       label: 'Fichas de Clientes',
       icon: <Users className="w-5 h-5" />,
       badge: inactiveCount > 0 ? `${inactiveCount} alertas` : null,
       badgeColor: 'bg-rose-100 text-rose-700',
-    },
-    {
-      id: 'services' as TabType,
-      label: 'Catálogo de Serviços',
-      icon: <Scissors className="w-5 h-5" />,
-      badge: null,
     },
     {
       id: 'staff' as TabType,
