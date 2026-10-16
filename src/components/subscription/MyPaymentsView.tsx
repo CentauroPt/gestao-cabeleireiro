@@ -239,11 +239,6 @@ export const MyPaymentsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap print:hidden">
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-50 border border-purple-200/60 text-[11px] font-bold text-purple-700">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Preços em tempo real</span>
-          </div>
-
           <button
             onClick={handleManualRefresh}
             disabled={isRefreshing}
