@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   AlertCircle,
   PlusCircle,
+  Scissors,
 } from 'lucide-react';
 
 export const MyPaymentsView: React.FC = () => {
@@ -44,20 +45,23 @@ export const MyPaymentsView: React.FC = () => {
     return Array.from(years).sort().reverse();
   }, [subscriptionPayments]);
 
-  const monthNames = [
-    { value: '01', label: 'Janeiro' },
-    { value: '02', label: 'Fevereiro' },
-    { value: '03', label: 'Março' },
-    { value: '04', label: 'Abril' },
-    { value: '05', label: 'Maio' },
-    { value: '06', label: 'Junho' },
-    { value: '07', label: 'Julho' },
-    { value: '08', label: 'Agosto' },
-    { value: '09', label: 'Setembro' },
-    { value: '10', label: 'Outubro' },
-    { value: '11', label: 'Novembro' },
-    { value: '12', label: 'Dezembro' },
-  ];
+  const monthNames = useMemo(
+    () => [
+      { value: '01', label: 'Janeiro' },
+      { value: '02', label: 'Fevereiro' },
+      { value: '03', label: 'Março' },
+      { value: '04', label: 'Abril' },
+      { value: '05', label: 'Maio' },
+      { value: '06', label: 'Junho' },
+      { value: '07', label: 'Julho' },
+      { value: '08', label: 'Agosto' },
+      { value: '09', label: 'Setembro' },
+      { value: '10', label: 'Outubro' },
+      { value: '11', label: 'Novembro' },
+      { value: '12', label: 'Dezembro' },
+    ],
+    []
+  );
 
   // Filtrar pagamentos
   const filteredPayments = useMemo(() => {
@@ -96,6 +100,62 @@ export const MyPaymentsView: React.FC = () => {
       .reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
   }, [filteredPayments]);
 
+  // Total pendente nos itens filtrados
+  const totalPendingFiltered = useMemo(() => {
+    return filteredPayments
+      .filter((p) => p.estado === 'pendente')
+      .reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
+  }, [filteredPayments]);
+
+  // Agrupar pagamentos por Mês e ordenar por Data para a Folha Oficial de Impressão
+  const paymentsGroupedByMonth = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        label: string;
+        payments: typeof subscriptionPayments;
+        totalValidated: number;
+        totalPending: number;
+      }
+    >();
+
+    // Ordenação cronológica por data (do mais recente para o mais antigo)
+    const sorted = [...filteredPayments].sort((a, b) => {
+      const dateA = new Date(a.data || 0).getTime();
+      const dateB = new Date(b.data || 0).getTime();
+      return dateB - dateA;
+    });
+
+    sorted.forEach((p) => {
+      const key = p.mes_referencia || (p.data ? p.data.slice(0, 7) : 'Geral');
+      let label = key;
+      if (key.includes('-')) {
+        const [y, m] = key.split('-');
+        const mObj = monthNames.find((mn) => mn.value === m);
+        label = `${mObj?.label || m} de ${y}`;
+      }
+
+      if (!map.has(key)) {
+        map.set(key, { label, payments: [], totalValidated: 0, totalPending: 0 });
+      }
+      const group = map.get(key)!;
+      group.payments.push(p);
+      if (p.estado === 'validado') {
+        group.totalValidated += Number(p.valor) || 0;
+      } else {
+        group.totalPending += Number(p.valor) || 0;
+      }
+    });
+
+    return Array.from(map.entries()).map(([key, data]) => ({
+      key,
+      label: data.label,
+      payments: data.payments,
+      totalValidated: data.totalValidated,
+      totalPending: data.totalPending,
+    }));
+  }, [filteredPayments, monthNames]);
+
   const handlePrint = () => {
     window.print();
   };
@@ -103,7 +163,9 @@ export const MyPaymentsView: React.FC = () => {
   const isTrialActive = currentSalon?.estado_subscricao === 'prova' && !isSubscriptionBlocked;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+    <>
+      {/* 1. Interface Interativa de Ecrã (Oculta na Impressão) */}
+      <div className="space-y-6 max-w-7xl mx-auto pb-16 print:hidden">
       {/* Diálogo de Pagamento */}
       {isPaymentModalOpen && (
         <SubscriptionLockModal
@@ -430,5 +492,241 @@ export const MyPaymentsView: React.FC = () => {
         </button>
       </div>
     </div>
+
+      {/* ========================================================
+          2. FOLHA FORMAL DE EXTRATO DE PAGAMENTOS (APENAS NA IMPRESSÃO)
+          Folha A4 formal e discriminada por Mês e por Data, com
+          Logótipo do Salão, Dados Fiscais, Totais e Validação.
+          ======================================================== */}
+      <div className="hidden print:block bg-white text-slate-900 w-full font-sans text-xs">
+        {/* Cabeçalho Formal com Logótipo do Salão e Metadados */}
+        <div className="border-b-2 border-slate-900 pb-5 mb-5 flex items-start justify-between gap-6">
+          {/* Lado Esquerdo: Logótipo e Identificação do Salão */}
+          <div className="flex items-center gap-4">
+            {currentSalon?.logoUrl ? (
+              <img
+                src={currentSalon.logoUrl}
+                alt={currentSalon.name}
+                className="w-16 h-16 object-contain rounded-xl border border-slate-300 p-1 bg-white shrink-0"
+              />
+            ) : (
+              <div
+                className="w-16 h-16 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-xs shrink-0"
+                style={{ backgroundColor: currentSalon?.primaryColor || '#8B5CF6' }}
+              >
+                <Scissors className="w-8 h-8 -rotate-45" />
+              </div>
+            )}
+            <div>
+              <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                {currentSalon?.name || 'Salão de Cabeleireiro'}
+              </h1>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {currentSalon?.address || 'Morada não especificada'}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500 mt-1">
+                {currentSalon?.nif && (
+                  <span>
+                    <strong>NIF:</strong> {currentSalon.nif}
+                  </span>
+                )}
+                {currentSalon?.phone && (
+                  <span>
+                    <strong>Tel:</strong> {currentSalon.phone}
+                  </span>
+                )}
+                {currentSalon?.email && (
+                  <span>
+                    <strong>Email:</strong> {currentSalon.email}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Lado Direito: Identificação do Documento */}
+          <div className="text-right shrink-0">
+            <span className="inline-block px-3 py-1 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-md mb-1.5">
+              Extrato Oficial
+            </span>
+            <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+              Histórico de Pagamentos SaaS
+            </h2>
+            <p className="text-[11px] text-slate-600 mt-0.5 font-mono">
+              Doc. Nº: <strong>EXT-{String(currentSalon?.id || '001').replace(/\D/g, '').slice(-5) || '1001'}/{new Date().getFullYear()}</strong>
+            </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              Emitido em: {new Date().toLocaleDateString('pt-PT')} às {new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+        </div>
+
+        {/* Quadro Resumo de Conta / Subscrição */}
+        <div className="grid grid-cols-4 gap-3 mb-6 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Mensalidade Contratada</span>
+            <span className="text-sm font-black text-slate-900">{monthlyRate.toFixed(2)} € / mês</span>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Liquidado</span>
+            <span className="text-sm font-black text-emerald-700">{totalPaidFiltered.toFixed(2)} €</span>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Pendente</span>
+            <span className="text-sm font-black text-amber-700">{totalPendingFiltered.toFixed(2)} €</span>
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">Estado da Conta</span>
+            <span className="text-xs font-bold text-slate-800">
+              {isSubscriptionBlocked
+                ? 'Bloqueado (Pendente)'
+                : isTrialActive
+                ? `Período Teste (${daysRemainingInTrial}d restantes)`
+                : 'Subscrição Regularizada'}
+            </span>
+          </div>
+        </div>
+
+        {/* Tabela Discriminada por Mês e por Data */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+              Discriminação de Mensalidades e Pagamentos
+            </h3>
+            <span className="text-[10px] text-slate-500">
+              {yearFilter !== 'ALL' || monthFilter !== 'ALL'
+                ? `Filtro: ${monthFilter !== 'ALL' ? monthNames.find((m) => m.value === monthFilter)?.label : 'Ano'} / ${yearFilter !== 'ALL' ? yearFilter : 'Todos'}`
+                : 'Histórico Completo'}
+            </span>
+          </div>
+
+          <table className="w-full text-left border-collapse border border-slate-300">
+            <thead>
+              <tr className="bg-slate-100 text-[10px] font-black uppercase text-slate-700 border-b border-slate-300">
+                <th className="py-2 px-3 border-r border-slate-200">Data de Pagamento</th>
+                <th className="py-2 px-3 border-r border-slate-200">Mês de Referência</th>
+                <th className="py-2 px-3 border-r border-slate-200">Método de Pagamento</th>
+                <th className="py-2 px-3 border-r border-slate-200">Identificador / Comprovativo</th>
+                <th className="py-2 px-3 text-right border-r border-slate-200">Valor (€)</th>
+                <th className="py-2 px-3 text-center">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paymentsGroupedByMonth.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center text-slate-400 italic">
+                    Sem registos de pagamentos para o período selecionado.
+                  </td>
+                </tr>
+              ) : (
+                paymentsGroupedByMonth.map((group) => (
+                  <React.Fragment key={group.key}>
+                    {/* Linha de Cabeçalho do Mês */}
+                    <tr className="bg-slate-100/90 border-t-2 border-b border-slate-300 text-[11px] font-black text-slate-900">
+                      <td colSpan={4} className="py-2 px-3 border-r border-slate-200">
+                        <span className="text-purple-950 uppercase font-black tracking-wide">
+                          Mês: {group.label}
+                        </span>
+                        <span className="text-[10px] font-normal text-slate-600 ml-2">
+                          ({group.payments.length} transação{group.payments.length > 1 ? 'ões' : ''})
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-right font-black text-slate-900 border-r border-slate-200">
+                        {group.totalValidated.toFixed(2)} €
+                      </td>
+                      <td className="py-2 px-3 text-center text-[10px] font-bold">
+                        {group.totalPending > 0 ? (
+                          <span className="text-amber-800">{group.totalPending.toFixed(2)} € pendente</span>
+                        ) : (
+                          <span className="text-emerald-800">Regularizado</span>
+                        )}
+                      </td>
+                    </tr>
+
+                    {/* Transações discriminadas com data exata */}
+                    {group.payments.map((p) => {
+                      const paymentDate = p.data
+                        ? new Date(p.data).toLocaleDateString('pt-PT', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })
+                        : '—';
+                      return (
+                        <tr key={p.id} className="border-b border-slate-200 text-[11px] hover:bg-slate-50">
+                          <td className="py-2 px-3 font-mono text-slate-700 border-r border-slate-200">
+                            {paymentDate}
+                          </td>
+                          <td className="py-2 px-3 font-semibold text-slate-800 border-r border-slate-200">
+                            {group.label}
+                          </td>
+                          <td className="py-2 px-3 text-slate-700 border-r border-slate-200">
+                            {p.metodo === 'transferencia' ? 'Transferência Bancária' : 'MB Way'}
+                          </td>
+                          <td className="py-2 px-3 font-mono text-[10px] text-slate-600 border-r border-slate-200">
+                            {p.comprovativo_ref || 'Ref. Padrão'}
+                          </td>
+                          <td className="py-2 px-3 text-right font-bold text-slate-900 border-r border-slate-200">
+                            {(Number(p.valor) || 0).toFixed(2)} €
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            {p.estado === 'validado' ? (
+                              <span className="inline-block px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                Validado
+                              </span>
+                            ) : (
+                              <span className="inline-block px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                                Pendente
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                ))
+              )}
+            </tbody>
+            {filteredPayments.length > 0 && (
+              <tfoot>
+                <tr className="bg-slate-100 border-t-2 border-slate-900 font-black text-xs text-slate-900">
+                  <td colSpan={4} className="py-2.5 px-3 uppercase tracking-wider border-r border-slate-200">
+                    Total Geral Liquidado ({filteredPayments.filter((p) => p.estado === 'validado').length} pagamentos validados)
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-sm text-emerald-800 border-r border-slate-200">
+                    {totalPaidFiltered.toFixed(2)} €
+                  </td>
+                  <td className="py-2.5 px-3 text-center text-[10px]">
+                    {totalPendingFiltered > 0 ? (
+                      <span className="text-amber-800 font-bold">+{totalPendingFiltered.toFixed(2)} € Pendente</span>
+                    ) : (
+                      <span className="text-emerald-800 font-bold">Regularizado</span>
+                    )}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+
+        {/* Rodapé Formal com Observações e Espaço para Carimbo / Assinatura */}
+        <div className="pt-4 border-t border-slate-300 mt-6 flex items-end justify-between text-[10px] text-slate-500">
+          <div className="max-w-md space-y-1">
+            <p className="font-bold text-slate-700 uppercase tracking-wider">
+              Conformidade e Registo:
+            </p>
+            <p className="leading-snug">
+              Este extrato comprova os pagamentos associados à licença de utilização do software SaaS de gestão de salão de cabeleireiro.
+              Documento processado por computador com autenticação digital de registos.
+            </p>
+          </div>
+
+          <div className="text-center w-64 pt-6 border-t border-slate-400">
+            <p className="text-[10px] font-bold text-slate-700">Assinatura / Carimbo do Salão</p>
+            <p className="text-[9px] text-slate-400 mt-1">Data: ____ / ____ / {new Date().getFullYear()}</p>
+          </div>
+        </div>
+      </div>
+    </>
   );
 };

@@ -64,7 +64,7 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
   ];
 
   return (
-    <aside className="w-full md:w-64 bg-white border-r border-slate-200 shrink-0">
+    <aside className="w-full md:w-64 bg-white border-r border-slate-200 shrink-0 print:hidden">
       <div className="p-4 space-y-1">
         {menuItems.map((item) => {
           const isActive = activeTab === item.id;

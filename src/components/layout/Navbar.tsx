@@ -57,7 +57,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
+    <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs print:hidden">
       {/* Banner de Inspeção do Programador */}
       {isImpersonating && (
         <div className="bg-purple-950 text-purple-100 px-4 py-2 text-xs font-bold border-b border-purple-800">

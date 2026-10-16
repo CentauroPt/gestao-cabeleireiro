@@ -433,7 +433,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
   return (
     <div className="space-y-6">
       {/* Top Banner & Header */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-full flex items-center gap-1">
@@ -478,7 +478,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
       </div>
 
       {/* Seletor de Módulos da Área do Administrador */}
-      <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center gap-2 border border-slate-200">
+      <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center gap-2 border border-slate-200 print:hidden">
         <button
           onClick={() => setAdminSection('reports')}
           className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${

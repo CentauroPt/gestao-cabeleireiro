@@ -87,3 +87,46 @@ body {
 .salon-theme .ring-purple-500\/20 {
   --tw-ring-color: var(--salon-primary, #8B5CF6) !important;
 }
+
+/* ========================================================
+   ESTILOS DE IMPRESSÃO FORMAL DE DOCUMENTOS E EXTRATOS
+   Garante que botões, barras e ecrã de navegação não saem
+   na folha, gerando uma folha A4 limpa e profissional.
+   ======================================================== */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Ocultar tudo o que for elemento de interface de ecrã */
+  header,
+  nav,
+  aside,
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Assegurar impressão fiel de cores e fundos suaves */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    margin: 1.2cm;
+    size: A4 portrait;
+  }
+}
+
