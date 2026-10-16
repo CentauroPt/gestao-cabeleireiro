@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Users, Scissors, UserCheck, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Calendar, Users, Scissors, UserCheck, AlertCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export type TabType = 'calendar' | 'clients' | 'staff' | 'services' | 'reports' | 'payments';
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
-  const { clients, currentUser, isAdminUnlocked } = useApp();
+  const { clients, currentUser } = useApp();
 
   // Conta quantos clientes estão inativos (+60 dias) para mostrar no badge
   const inactiveCount = clients.filter((c) => {
@@ -48,19 +48,6 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
       badge: !isAdmin ? 'Apenas Admin' : null,
       badgeColor: 'bg-amber-100 text-amber-800 text-[10px]',
     },
-    ...(isAdmin
-      ? [
-          {
-            id: 'reports' as TabType,
-            label: 'Administrador',
-            icon: <ShieldCheck className="w-5 h-5" />,
-            badge: !isAdminUnlocked ? 'Admin Lock' : 'Liberado',
-            badgeColor: !isAdminUnlocked
-              ? 'bg-amber-100 text-amber-800 text-[10px]'
-              : 'bg-emerald-100 text-emerald-800 text-[10px]',
-          },
-        ]
-      : []),
   ];
 
   return (
