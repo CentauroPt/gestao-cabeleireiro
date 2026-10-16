@@ -96,9 +96,6 @@ export const SalonAdminsView: React.FC = () => {
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
               Gestão de Administradores do Salão
             </h2>
-            <p className="text-xs sm:text-sm text-purple-200/90 max-w-2xl leading-relaxed">
-              Aqui pode promover colaboradores a <strong>Administradores</strong> com palavra-passe dedicada para aceder a esta área, relatórios financeiros e configurações do salão.
-            </p>
           </div>
 
           <div className="flex items-center gap-3 shrink-0 self-start md:self-center">
