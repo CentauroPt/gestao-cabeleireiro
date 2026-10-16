@@ -296,11 +296,11 @@ export const DeveloperPortalView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-6 lg:p-8 relative">
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-6 lg:p-8 relative print:min-h-0 print:p-0 print:bg-white print:text-slate-900">
       {/* Notificações no Painel do Programador */}
       {notification && (
         <div
-          className={`fixed top-4 right-4 z-50 max-w-md p-4 rounded-2xl shadow-2xl border text-xs font-bold flex items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-200 ${
+          className={`fixed top-4 right-4 z-50 max-w-md p-4 rounded-2xl shadow-2xl border text-xs font-bold flex items-center justify-between gap-3 animate-in slide-in-from-top-2 duration-200 print:hidden ${
             notification.type === 'error'
               ? 'bg-rose-950/95 border-rose-500/50 text-rose-200'
               : notification.type === 'success'
@@ -323,7 +323,7 @@ export const DeveloperPortalView: React.FC = () => {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6 print:hidden">
         {/* Top Header */}
         <div className="bg-slate-800/90 border border-slate-700 rounded-3xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -819,7 +819,7 @@ export const DeveloperPortalView: React.FC = () => {
 
       {/* Modal de Suspensão com Motivo */}
       {suspendingSalon && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 print:hidden">
           <div className="bg-slate-800 border border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl text-slate-100">
             <div className="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
               <PauseCircle className="w-6 h-6" />
@@ -867,7 +867,7 @@ export const DeveloperPortalView: React.FC = () => {
 
       {/* Modal de Criar Salão pelo Programador */}
       {isNewSalonModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 print:hidden">
           <div className="bg-slate-800 border border-slate-700 rounded-3xl max-w-lg w-full p-6 shadow-2xl text-slate-100">
             <h3 className="text-lg font-bold text-white mb-1">
               + Registar Novo Salão (Criado pelo Programador)
@@ -1010,7 +1010,7 @@ export const DeveloperPortalView: React.FC = () => {
 
       {/* Modal de Confirmação com Credenciais do Novo Salão */}
       {createdSalonCredentials && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 print:hidden">
           <div className="bg-slate-800 border border-emerald-500/50 rounded-3xl max-w-md w-full p-6 shadow-2xl text-slate-100 animate-in fade-in duration-200 text-center">
             <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
               <CheckCircle2 className="w-6 h-6" />
@@ -1050,7 +1050,7 @@ export const DeveloperPortalView: React.FC = () => {
 
       {/* Modal de Alterar Palavra-passe do Programador */}
       {isDevPasswordModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 print:hidden">
           <div className="bg-slate-800 border border-slate-700 rounded-3xl max-w-sm w-full p-6 shadow-2xl text-slate-100 animate-in fade-in duration-200">
             <div className="w-12 h-12 bg-purple-500/20 text-purple-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
               <Key className="w-6 h-6" />
@@ -1121,7 +1121,7 @@ export const DeveloperPortalView: React.FC = () => {
 
       {/* Modal de Alterar Palavra-passe de Salão */}
       {editingSalonPassword && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 print:hidden">
           <div className="bg-slate-800 border border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl text-slate-100 animate-in fade-in duration-200">
             <div className="w-12 h-12 bg-indigo-500/20 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
               <Key className="w-6 h-6" />
