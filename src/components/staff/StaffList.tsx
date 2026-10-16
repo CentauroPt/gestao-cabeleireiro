@@ -38,7 +38,7 @@ export const StaffList: React.FC = () => {
 
   const handleOpenPromote = (user: User) => {
     setUserToPromote(user);
-    setPromotePassword(user.password || '');
+    setPromotePassword('');
     setShowPromotePassword(false);
   };
 

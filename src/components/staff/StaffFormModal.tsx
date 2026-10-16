@@ -27,7 +27,7 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
   const [email, setEmail] = useState(initialUser?.email || '');
   const [phone, setPhone] = useState(initialUser?.phone || '');
   const [role, setRole] = useState<Role>(initialUser?.role || 'COLABORADOR');
-  const [password, setPassword] = useState(initialUser?.password || '');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [color, setColor] = useState(initialUser?.color || PRESET_COLORS[0]);
   const [specialtiesStr, setSpecialtiesStr] = useState(initialUser?.specialties.join(', ') || '');
@@ -205,7 +205,8 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={initialUser?.password ? 'Manter palavra-passe atual ou definir nova' : 'Introduza a palavra-passe'}
+                  placeholder={initialUser?.password ? 'Deixar em branco para manter a atual ou digitar nova' : 'Introduza a palavra-passe'}
+                  autoComplete="new-password"
                   className="w-full text-xs pl-3 pr-9 py-2 border border-purple-200 bg-purple-50/30 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
                 />
                 <button
@@ -218,7 +219,7 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
                 </button>
               </div>
               <span className="text-[10px] text-slate-400 mt-1 block">
-                Necessária para aceder à área de estatística e relatórios.
+                Necessária para aceder à área de Administrador e relatórios.
               </span>
             </div>
           )}

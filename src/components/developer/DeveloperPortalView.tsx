@@ -774,7 +774,7 @@ export const DeveloperPortalView: React.FC = () => {
                           <button
                             onClick={() => {
                               setEditingSalonPassword(item);
-                              setNewSalonPassword(item.adminUser?.password || '');
+                              setNewSalonPassword('');
                               setShowSalonPassword(true);
                               setSalonPasswordError('');
                             }}
