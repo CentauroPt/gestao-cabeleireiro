@@ -6,6 +6,14 @@
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- 0. LIMPEZA PREVENTIVA DAS TABELAS OPERACIONAIS
+-- Garante compatibilidade caso existam tabelas antigas com tipos UUID incompatíveis
+DROP TABLE IF EXISTS agendamentos CASCADE;
+DROP TABLE IF EXISTS clientes CASCADE;
+DROP TABLE IF EXISTS servicos CASCADE;
+DROP TABLE IF EXISTS utilizadores CASCADE;
+DROP TABLE IF EXISTS saloes CASCADE;
+
 -- 1. TABELA DE SALÕES (Multi-Tenancy)
 CREATE TABLE IF NOT EXISTS saloes (
   id TEXT PRIMARY KEY,
