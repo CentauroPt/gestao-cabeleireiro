@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Users, Scissors, UserCheck, AlertCircle } from 'lucide-react';
+import { Calendar, Users, Scissors, UserCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export type TabType = 'calendar' | 'clients' | 'staff' | 'services' | 'reports' | 'payments';
@@ -81,21 +81,6 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
             </button>
           );
         })}
-      </div>
-
-      {/* Dica de Segurança / RBAC no rodapé */}
-      <div className="m-4 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs font-semibold text-slate-700">Regras de Acesso Ativas</p>
-            <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-              {currentUser?.role === 'ADMIN'
-                ? 'Como Administrador, tem controlo total sobre eliminação de reservas e gestão da equipa.'
-                : 'Como Colaborador, pode agendar para qualquer colega, mas a eliminação de dados está bloqueada.'}
-            </p>
-          </div>
-        </div>
       </div>
     </aside>
   );
