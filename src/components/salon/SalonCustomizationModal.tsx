@@ -369,11 +369,6 @@ export const SalonCustomizationModal: React.FC<Props> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Nota de Isolamento */}
-          <div className="p-3 bg-purple-50/60 border border-purple-100 rounded-xl text-[11px] text-purple-900 leading-snug">
-            <strong>Isolamento Multi-Salão:</strong> Esta personalização é aplicada exclusivamente ao salão{' '}
-            <strong>{currentSalon?.name}</strong>. Nenhum outro salão no sistema será alterado.
-          </div>
 
           {/* Rodapé de Ações */}
           <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
