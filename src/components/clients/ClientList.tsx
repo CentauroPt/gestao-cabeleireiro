@@ -76,10 +76,10 @@ export const ClientList: React.FC<Props> = ({ onDirectBook }) => {
 
   const handleDeleteClient = async (client: Client) => {
     if (currentUser?.role !== 'ADMIN') {
-      alert('Acesso negado: Apenas o Administrador do salão pode apagar fichas de clientes.');
+      alert('Acesso negado: Apenas um Administrador do salão pode apagar fichas de clientes.');
       return;
     }
-    if (confirm(`Tem a certeza que deseja eliminar definitivamente a ficha de ${client.name}?`)) {
+    if (confirm(`Tem a certeza que deseja eliminar definitivamente a ficha de "${client.name}"? Esta ação é irreversível e apenas pode ser executada por um Administrador.`)) {
       await deleteClient(client.id);
     }
   };
@@ -300,22 +300,15 @@ export const ClientList: React.FC<Props> = ({ onDirectBook }) => {
                             <Edit2 className="w-4 h-4" />
                           </button>
 
-                          {/* Eliminar (apenas visível/permitido se Admin!) */}
-                          {currentUser?.role === 'ADMIN' ? (
+                          {/* Eliminar (Exclusivo para Administrador) */}
+                          {currentUser?.role === 'ADMIN' && (
                             <button
                               onClick={() => handleDeleteClient(client)}
-                              title="Eliminar cliente (Apenas Administrador)"
+                              title="Eliminar cliente (Exclusivo Administrador)"
                               className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
-                          ) : (
-                            <span
-                              title="Colaboradores não podem apagar clientes"
-                              className="p-1.5 text-slate-300 cursor-not-allowed"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </span>
                           )}
                         </div>
                       </td>
