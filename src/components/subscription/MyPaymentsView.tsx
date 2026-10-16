@@ -80,7 +80,11 @@ export const MyPaymentsView: React.FC = () => {
   const effectiveMonthlyRate =
     currentSalon?.valor_mensal !== undefined
       ? Number(currentSalon.valor_mensal)
-      : (monthlyRate || billingConfig?.valor_mensal_padrao || 29.0);
+      : monthlyRate !== undefined
+      ? monthlyRate
+      : billingConfig?.valor_mensal_padrao !== undefined
+      ? billingConfig.valor_mensal_padrao
+      : 29.0;
 
   // Anos disponíveis nos pagamentos ou ano atual
   const availableYears = useMemo(() => {

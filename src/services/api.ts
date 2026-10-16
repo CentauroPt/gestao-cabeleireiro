@@ -87,7 +87,10 @@ export class ApiService {
       }
     } catch {}
 
-    const defaultRate = this.billingConfig.valor_mensal_padrao || 29.00;
+    const defaultRate =
+      this.billingConfig.valor_mensal_padrao !== undefined
+        ? Number(this.billingConfig.valor_mensal_padrao)
+        : 29.00;
     const rawSalons = loadFromLocalStorage<Salon>(STORAGE_KEYS.SALONS, []);
     this.salons = rawSalons.map((s) => {
       const regDate = s.data_registo || s.createdAt || new Date().toISOString();
@@ -190,7 +193,10 @@ export class ApiService {
     const trialEndIso =
       params.fim_prova ||
       new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString();
-    const defaultRate = this.billingConfig.valor_mensal_padrao || 29.0;
+    const defaultRate =
+      this.billingConfig.valor_mensal_padrao !== undefined
+        ? Number(this.billingConfig.valor_mensal_padrao)
+        : 29.0;
     const monthlyRate =
       params.valor_mensal !== undefined ? Number(params.valor_mensal) : defaultRate;
     const subscriptionStatus = params.estado_subscricao || 'prova';
@@ -901,7 +907,10 @@ export class ApiService {
   } {
     this.reloadFromStorage();
     const salon = this.salons.find((s) => s.id === salonId);
-    const defaultRate = this.billingConfig.valor_mensal_padrao || 29.0;
+    const defaultRate =
+      this.billingConfig.valor_mensal_padrao !== undefined
+        ? Number(this.billingConfig.valor_mensal_padrao)
+        : 29.0;
     if (!salon) {
       return {
         isBlocked: false,
@@ -1105,7 +1114,13 @@ export class ApiService {
       cliente_nome: salon.name,
       cliente_email: salon.email || '',
       data: now.toISOString(),
-      valor: Number(params.valor) || salon.valor_mensal || 29.0,
+      valor:
+        Number(params.valor) ||
+        (salon.valor_mensal !== undefined
+          ? Number(salon.valor_mensal)
+          : this.billingConfig.valor_mensal_padrao !== undefined
+          ? Number(this.billingConfig.valor_mensal_padrao)
+          : 29.0),
       metodo: params.metodo,
       estado: 'pendente',
       mes_referencia: params.mes_referencia || currentMonth,

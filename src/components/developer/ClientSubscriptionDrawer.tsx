@@ -330,9 +330,9 @@ export const ClientSubscriptionDrawer: React.FC<ClientSubscriptionDrawerProps> =
                     min="0"
                     value={monthlyRateInput}
                     onChange={(e) => setMonthlyRateInput(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm font-black text-white focus:outline-none focus:border-purple-500"
+                    className="w-full pl-3.5 pr-16 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm font-black text-white focus:outline-none focus:border-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none select-none">
                     €/mês
                   </span>
                 </div>

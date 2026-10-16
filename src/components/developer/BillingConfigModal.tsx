@@ -21,7 +21,7 @@ export const BillingConfigModal: React.FC<BillingConfigModalProps> = ({ onClose 
   const [mbway, setMbway] = useState(billingConfig.numero_mbway || '');
   const [whatsapp, setWhatsapp] = useState(billingConfig.numero_whatsapp || '');
   const [defaultRate, setDefaultRate] = useState<string>(
-    (billingConfig.valor_mensal_padrao || 29.0).toString()
+    (billingConfig.valor_mensal_padrao !== undefined ? billingConfig.valor_mensal_padrao : 29.0).toString()
   );
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -33,7 +33,8 @@ export const BillingConfigModal: React.FC<BillingConfigModalProps> = ({ onClose 
 
     try {
       const parsedRate = parseFloat(defaultRate);
-      const rateVal = isNaN(parsedRate) ? 29.0 : parsedRate;
+      const fallbackRate = billingConfig.valor_mensal_padrao !== undefined ? billingConfig.valor_mensal_padrao : 29.0;
+      const rateVal = !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : fallbackRate;
 
       const savePromise = updateBillingConfig({
         iban: iban.trim(),
@@ -161,9 +162,9 @@ export const BillingConfigModal: React.FC<BillingConfigModalProps> = ({ onClose 
                 required
                 value={defaultRate}
                 onChange={(e) => setDefaultRate(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-black text-white focus:outline-none focus:border-purple-500"
+                className="w-full pl-3.5 pr-16 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-black text-white focus:outline-none focus:border-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none select-none">
                 €/mês
               </span>
             </div>

@@ -80,9 +80,11 @@ export const DeveloperPortalView: React.FC = () => {
   const [newSalonAdminEmail, setNewSalonAdminEmail] = useState('');
   const [newSalonAdminPassword, setNewSalonAdminPassword] = useState('');
   const [showNewSalonPassword, setShowNewSalonPassword] = useState(false);
-  const [newSalonRate, setNewSalonRate] = useState<string>(
-    (billingConfig?.valor_mensal_padrao || 29.0).toString()
-  );
+  const defaultGlobalRate =
+    billingConfig?.valor_mensal_padrao !== undefined
+      ? billingConfig.valor_mensal_padrao
+      : 29.0;
+  const [newSalonRate, setNewSalonRate] = useState<string>(defaultGlobalRate.toString());
   const [newSalonTrialDays, setNewSalonTrialDays] = useState<string>('30');
   const [newSalonStatus, setNewSalonStatus] = useState<SubscriptionStatus>('prova');
   const [createdSalonCredentials, setCreatedSalonCredentials] = useState<{
@@ -92,7 +94,7 @@ export const DeveloperPortalView: React.FC = () => {
   } | null>(null);
 
   useEffect(() => {
-    if (billingConfig?.valor_mensal_padrao && (!newSalonRate || newSalonRate === '29')) {
+    if (billingConfig?.valor_mensal_padrao !== undefined) {
       setNewSalonRate(billingConfig.valor_mensal_padrao.toString());
     }
   }, [billingConfig?.valor_mensal_padrao]);
@@ -240,7 +242,7 @@ export const DeveloperPortalView: React.FC = () => {
 
     const chosenPassword = newSalonAdminPassword.trim();
     const parsedRate = parseFloat(newSalonRate);
-    const validRate = !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : (billingConfig?.valor_mensal_padrao || 29.0);
+    const validRate = !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : defaultGlobalRate;
     const parsedDays = parseInt(newSalonTrialDays, 10);
     const validDays = !isNaN(parsedDays) && parsedDays >= 0 ? parsedDays : 30;
 
@@ -274,7 +276,7 @@ export const DeveloperPortalView: React.FC = () => {
       setNewSalonAdminName('');
       setNewSalonAdminEmail('');
       setNewSalonAdminPassword('');
-      setNewSalonRate((billingConfig?.valor_mensal_padrao || 29.0).toString());
+      setNewSalonRate(defaultGlobalRate.toString());
       setNewSalonTrialDays('30');
       setNewSalonStatus('prova');
     }
@@ -404,7 +406,12 @@ export const DeveloperPortalView: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setIsNewSalonModalOpen(true)}
+              onClick={() => {
+                setNewSalonRate(defaultGlobalRate.toString());
+                setNewSalonTrialDays('30');
+                setNewSalonStatus('prova');
+                setIsNewSalonModalOpen(true);
+              }}
               className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-md shadow-purple-600/30"
             >
               <PlusCircle className="w-4 h-4" />
@@ -693,11 +700,17 @@ export const DeveloperPortalView: React.FC = () => {
                                 </span>
                               ) : isTrial ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                                  <Clock className="w-3 h-3 text-indigo-400" /> Prova ({item.daysRemainingInTrial ?? 0}d) • {(s.valor_mensal !== undefined ? Number(s.valor_mensal) : 29).toFixed(0)}€/mês
+                                  <Clock className="w-3 h-3 text-indigo-400" /> Prova ({item.daysRemainingInTrial ?? 0}d) • {(() => {
+                                    const rate = s.valor_mensal !== undefined ? Number(s.valor_mensal) : defaultGlobalRate;
+                                    return (rate % 1 === 0 ? rate.toFixed(0) : rate.toFixed(2)) + '€/mês';
+                                  })()}
                                 </span>
                               ) : isAtivo ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                  <CheckCircle2 className="w-3 h-3" /> Ativo • {(s.valor_mensal !== undefined ? Number(s.valor_mensal) : 29).toFixed(0)}€/mês
+                                  <CheckCircle2 className="w-3 h-3" /> Ativo • {(() => {
+                                    const rate = s.valor_mensal !== undefined ? Number(s.valor_mensal) : defaultGlobalRate;
+                                    return (rate % 1 === 0 ? rate.toFixed(0) : rate.toFixed(2)) + '€/mês';
+                                  })()}
                                 </span>
                               ) : isSuspenso ? (
                                 <div>
@@ -1045,12 +1058,15 @@ export const DeveloperPortalView: React.FC = () => {
                         required
                         value={newSalonRate}
                         onChange={(e) => setNewSalonRate(e.target.value)}
-                        className="w-full pl-3 pr-7 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-bold text-white focus:outline-none focus:border-purple-500 font-mono"
+                        className="w-full pl-3 pr-14 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-bold text-white focus:outline-none focus:border-purple-500 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
-                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
-                        €
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold pointer-events-none select-none">
+                        €/mês
                       </span>
                     </div>
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Defeito: {defaultGlobalRate}€/mês
+                    </span>
                   </div>
 
                   <div>

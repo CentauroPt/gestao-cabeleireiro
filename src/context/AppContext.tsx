@@ -206,7 +206,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const subscriptionStatus = useMemo(() => {
     const activeSalon = salons.find((s) => s.id === currentSalonId);
-    const defaultRate = billingConfig.valor_mensal_padrao || 29.0;
+    const defaultRate =
+      billingConfig.valor_mensal_padrao !== undefined
+        ? billingConfig.valor_mensal_padrao
+        : 29.0;
     if (!currentSalonId) {
       return {
         isBlocked: false,
@@ -217,9 +220,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     const check = api.checkSalonSubscription(currentSalonId);
-    const effectiveRate = activeSalon?.valor_mensal !== undefined
-      ? Number(activeSalon.valor_mensal)
-      : (check.monthlyRate || defaultRate);
+    const effectiveRate =
+      activeSalon?.valor_mensal !== undefined
+        ? Number(activeSalon.valor_mensal)
+        : check.monthlyRate !== undefined
+        ? check.monthlyRate
+        : defaultRate;
     return {
       ...check,
       monthlyRate: effectiveRate,

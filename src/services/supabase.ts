@@ -154,7 +154,10 @@ export class SupabaseService {
         iban: data.iban,
         numero_mbway: data.numero_mbway,
         numero_whatsapp: data.numero_whatsapp,
-        valor_mensal_padrao: Number(data.valor_mensal_padrao) || 29.0,
+        valor_mensal_padrao:
+          data.valor_mensal_padrao !== null && data.valor_mensal_padrao !== undefined
+            ? Number(data.valor_mensal_padrao)
+            : 29.0,
       };
     } catch {
       return null;

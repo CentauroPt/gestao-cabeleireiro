@@ -140,7 +140,11 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
   const effectiveRate =
     currentSalon?.valor_mensal !== undefined
       ? Number(currentSalon.valor_mensal)
-      : (monthlyRate || billingConfig?.valor_mensal_padrao || 29.0);
+      : monthlyRate !== undefined
+      ? monthlyRate
+      : billingConfig?.valor_mensal_padrao !== undefined
+      ? billingConfig.valor_mensal_padrao
+      : 29.0;
   const formattedRate = effectiveRate.toFixed(2);
 
   const referenceCode = `SALON-${(currentSalon?.id || '001').replace('salon-', '').slice(-6)}-${currentMonthStr().replace('-', '')}`;
