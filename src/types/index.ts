@@ -86,6 +86,8 @@ export interface Client {
 
 export type AppointmentStatus = 'AGENDADA' | 'CONFIRMADA' | 'CONCLUIDA' | 'CANCELADA';
 
+export type BookingChannel = 'presencial' | 'telefone' | 'whatsapp';
+
 export interface Appointment {
   id: string;
   salonId: string;
@@ -104,4 +106,5 @@ export interface Appointment {
   notes?: string;
   createdById: string; // Quem registou a marcação (qualquer colaborador pode registar)
   createdAt: string;
+  bookingChannel?: BookingChannel; // Tipo / Canal de entrada da reserva: 'presencial' | 'telefone' | 'whatsapp'
 }

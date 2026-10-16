@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Appointment, Client } from '../../types';
+import type { Appointment, Client, BookingChannel } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { AppointmentModal } from './AppointmentModal';
+import { BookingChannelModal } from './BookingChannelModal';
 import { isPastAppointment } from '../../services/conflictValidator';
 import {
   Calendar as CalendarIcon,
@@ -132,7 +133,9 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
   const [slotInterval, setSlotInterval] = useState<10 | 15 | 30>(30); // Intervalo na vista semanal
 
   // Estados para abertura do modal
-  const [isModalOpen, setIsModalOpen] = useState(!!initialClientToBook);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isChannelModalOpen, setIsChannelModalOpen] = useState(!!initialClientToBook);
+  const [selectedBookingChannel, setSelectedBookingChannel] = useState<BookingChannel>('presencial');
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [slotToBook, setSlotToBook] = useState<{ time: string; userId: string; dateStr?: string } | null>(null);
 
@@ -140,9 +143,29 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
     if (initialClientToBook) {
       setSelectedAppointment(null);
       setSlotToBook(null);
-      setIsModalOpen(true);
+      setIsChannelModalOpen(true);
     }
   }, [initialClientToBook]);
+
+  const handleStartNewBooking = (slotInfo?: { time: string; userId: string; dateStr?: string } | null) => {
+    setSelectedAppointment(null);
+    setSlotToBook(slotInfo || null);
+    setIsChannelModalOpen(true);
+  };
+
+  const handleChannelSelected = (channel: BookingChannel) => {
+    setSelectedBookingChannel(channel);
+    setIsChannelModalOpen(false);
+    setIsModalOpen(true);
+  };
+
+  const handleChannelCancel = () => {
+    setIsChannelModalOpen(false);
+    setSlotToBook(null);
+    if (initialClientToBook && onClearInitialClient) {
+      onClearInitialClient();
+    }
+  };
 
   // Estados para Drag & Drop com o rato
   const [draggedAptId, setDraggedAptId] = useState<string | null>(null);
@@ -265,9 +288,7 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
       alert('Não são permitidas marcações para horários ou dias passados.');
       return;
     }
-    setSelectedAppointment(null);
-    setSlotToBook({ time, userId, dateStr: targetDate });
-    setIsModalOpen(true);
+    handleStartNewBooking({ time, userId, dateStr: targetDate });
   };
 
   // Clique numa reserva existente para ver / editar horários
@@ -403,11 +424,7 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
           </div>
 
           <button
-            onClick={() => {
-              setSelectedAppointment(null);
-              setSlotToBook(null);
-              setIsModalOpen(true);
-            }}
+            onClick={() => handleStartNewBooking()}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-200 transition-all cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
@@ -981,6 +998,13 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
         </div>
       )}
 
+      {/* Janela Inicial de Seleção do Tipo de Reserva (Presencial, Chamada telefónica, WhatsApp) */}
+      <BookingChannelModal
+        isOpen={isChannelModalOpen}
+        onSelectChannel={handleChannelSelected}
+        onClose={handleChannelCancel}
+      />
+
       {/* Modal de Reserva (Novo ou Edição com alteração de início e fim) */}
       {isModalOpen && (
         <AppointmentModal
@@ -989,6 +1013,7 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
           initialTime={slotToBook?.time}
           initialUserId={slotToBook?.userId}
           initialClient={initialClientToBook}
+          initialBookingChannel={selectedBookingChannel}
           onClose={() => {
             setIsModalOpen(false);
             setSelectedAppointment(null);

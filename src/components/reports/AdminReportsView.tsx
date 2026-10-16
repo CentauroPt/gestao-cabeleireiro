@@ -34,6 +34,7 @@ import {
 import { SalonCustomizationModal } from '../salon/SalonCustomizationModal';
 import { MyPaymentsView } from '../subscription/MyPaymentsView';
 import { SalonAdminsView } from './SalonAdminsView';
+import { BookingStatsView } from './BookingStatsView';
 
 type ReportTab = 'clients' | 'daily' | 'monthly' | 'staff';
 
@@ -69,7 +70,7 @@ interface SalesTransaction {
 }
 
 interface AdminReportsViewProps {
-  initialSection?: 'reports' | 'payments' | 'admins';
+  initialSection?: 'reports' | 'booking_stats' | 'payments' | 'admins';
 }
 
 export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSection = 'reports' }) => {
@@ -91,7 +92,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
   } = useApp();
 
   const isTrialActive = currentSalon?.estado_subscricao === 'prova' && !isSubscriptionBlocked;
-  const [adminSection, setAdminSection] = useState<'reports' | 'payments' | 'admins'>(initialSection);
+  const [adminSection, setAdminSection] = useState<'reports' | 'booking_stats' | 'payments' | 'admins'>(initialSection);
 
   React.useEffect(() => {
     if (initialSection) {
@@ -572,6 +573,18 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
         </button>
 
         <button
+          onClick={() => setAdminSection('booking_stats')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+            adminSection === 'booking_stats'
+              ? 'bg-white text-purple-700 shadow-sm border border-slate-200/60'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4 shrink-0" />
+          <span>Estatistica de reservas</span>
+        </button>
+
+        <button
           onClick={() => setAdminSection('payments')}
           className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
             adminSection === 'payments'
@@ -609,7 +622,9 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
         </button>
       </div>
 
-      {adminSection === 'payments' ? (
+      {adminSection === 'booking_stats' ? (
+        <BookingStatsView />
+      ) : adminSection === 'payments' ? (
         <MyPaymentsView />
       ) : adminSection === 'admins' ? (
         <SalonAdminsView />

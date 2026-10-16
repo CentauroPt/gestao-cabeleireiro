@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Appointment, Client } from '../../types';
+import type { Appointment, Client, BookingChannel } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { ClientFormModal } from '../clients/ClientFormModal';
 import {
@@ -24,6 +24,9 @@ import {
   Plus,
   PlusCircle,
   Save,
+  PhoneCall,
+  MessageCircle,
+  Layers,
 } from 'lucide-react';
 
 interface Props {
@@ -32,6 +35,7 @@ interface Props {
   initialTime?: string;
   initialUserId?: string;
   initialClient?: Client | null;
+  initialBookingChannel?: BookingChannel;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -42,6 +46,7 @@ export const AppointmentModal: React.FC<Props> = ({
   initialTime,
   initialUserId,
   initialClient,
+  initialBookingChannel,
   onClose,
   onSuccess,
 }) => {
@@ -87,7 +92,16 @@ export const AppointmentModal: React.FC<Props> = ({
     initialAppointment?.serviceIds ? initialAppointment.serviceIds : []
   );
   const [notes, setNotes] = useState<string>(initialAppointment?.notes || '');
+  const [bookingChannel, setBookingChannel] = useState<BookingChannel>(
+    initialAppointment?.bookingChannel || initialBookingChannel || 'presencial'
+  );
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (initialBookingChannel && !initialAppointment) {
+      setBookingChannel(initialBookingChannel);
+    }
+  }, [initialBookingChannel, initialAppointment]);
 
   useEffect(() => {
     if (initialClient && !initialAppointment) {
@@ -298,6 +312,7 @@ export const AppointmentModal: React.FC<Props> = ({
       customPrice: numericPrice,
       updateBaseServicePrice: updateCatalogSuggestion,
       notes: notes.trim() || undefined,
+      bookingChannel,
     });
     setIsSubmitting(false);
 
@@ -330,6 +345,7 @@ export const AppointmentModal: React.FC<Props> = ({
       updateBaseServicePrice: updateCatalogSuggestion,
       notes: notes.trim() || undefined,
       serviceIds: targetServiceIds,
+      bookingChannel,
     });
     setIsSubmitting(false);
 
@@ -399,6 +415,61 @@ export const AppointmentModal: React.FC<Props> = ({
               Esta reserva é passada (horário anterior ao momento atual). As reservas passadas não podem ser eliminadas por nenhum utilizador.
             </div>
           )}
+
+          {/* Tipo de Reserva (Canal de Entrada) */}
+          <div className="bg-slate-50 border border-slate-200/90 p-3 rounded-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider">
+                <Layers className="w-3.5 h-3.5 text-purple-600" />
+                Tipo de Reserva *
+              </label>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Canal de Entrada
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setBookingChannel('presencial')}
+                className={`py-2 px-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                  bookingChannel === 'presencial'
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50/50'
+                }`}
+              >
+                <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                <span>Presencial</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBookingChannel('telefone')}
+                className={`py-2 px-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                  bookingChannel === 'telefone'
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
+                }`}
+              >
+                <PhoneCall className="w-3.5 h-3.5 shrink-0" />
+                <span>Chamada telefónica</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBookingChannel('whatsapp')}
+                className={`py-2 px-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                  bookingChannel === 'whatsapp'
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50'
+                }`}
+              >
+                <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>WhatsApp</span>
+              </button>
+            </div>
+          </div>
+
           {/* Seletor de Cliente, Pesquisa & Ícone para Registar Novo Cliente */}
           <div>
             <div className="flex items-center justify-between mb-1.5">

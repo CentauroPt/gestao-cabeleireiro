@@ -6,6 +6,7 @@ import type {
   Service,
   Client,
   Appointment,
+  BookingChannel,
   TabType,
   BillingConfig,
   SubscriptionPayment,
@@ -109,6 +110,7 @@ interface AppContextType {
     customPrice?: number;
     updateBaseServicePrice?: boolean;
     notes?: string;
+    bookingChannel?: BookingChannel;
   }) => Promise<boolean>;
   moveAppointment: (
     appointmentId: string,
@@ -126,6 +128,7 @@ interface AppContextType {
     updateBaseServicePrice?: boolean;
     notes?: string;
     serviceIds?: string[];
+    bookingChannel?: BookingChannel;
   }) => Promise<boolean>;
   deleteAppointment: (id: string) => Promise<boolean>;
   completeAppointment: (id: string) => Promise<boolean>;
@@ -500,6 +503,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customPrice?: number;
     updateBaseServicePrice?: boolean;
     notes?: string;
+    bookingChannel?: BookingChannel;
   }): Promise<boolean> => {
     if (!currentSalon || !currentUser) return false;
 
@@ -552,6 +556,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: 'AGENDADA',
         notes: data.notes,
         createdById: currentUser.id,
+        bookingChannel: data.bookingChannel || 'presencial',
       });
 
       await refreshData();
@@ -650,6 +655,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateBaseServicePrice?: boolean;
     notes?: string;
     serviceIds?: string[];
+    bookingChannel?: BookingChannel;
   }): Promise<boolean> => {
     if (!currentUser) return false;
     const apt = appointments.find((a) => a.id === params.appointmentId);
@@ -685,6 +691,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (params.customPrice !== undefined) {
         updateData.totalPrice = Number(params.customPrice);
+      }
+
+      if (params.bookingChannel !== undefined) {
+        updateData.bookingChannel = params.bookingChannel;
       }
 
       const activeServiceIds = updateData.serviceIds || apt.serviceIds;
