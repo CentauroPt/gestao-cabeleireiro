@@ -20,6 +20,7 @@ import {
   Sparkles,
   Info,
   Server,
+  Trash2,
 } from 'lucide-react';
 
 export const CloudDatabasePanel: React.FC = () => {
@@ -27,6 +28,7 @@ export const CloudDatabasePanel: React.FC = () => {
     isCloudConfigured,
     syncCloudNow,
     exportToCloudNow,
+    clearCloudDataNow,
     importFromCloudNow,
     testCloudConnection,
     updateCloudCredentials,
@@ -51,6 +53,7 @@ export const CloudDatabasePanel: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isClearingCloud, setIsClearingCloud] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const [showSqlModal, setShowSqlModal] = useState(false);
 
@@ -121,6 +124,32 @@ export const CloudDatabasePanel: React.FC = () => {
       handleTest();
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleClearCloud = async () => {
+    if (
+      !confirm(
+        '⚠️ ATENÇÃO: Deseja LIMPAR / ESVAZIAR todos os dados da Base de Dados na Nuvem (Supabase)?\n\nEsta ação irá remover todas as marcações, clientes, serviços e salões registados na nuvem.\n(Os dados locais deste computador NÃO serão afetados, apenas os dados na nuvem).'
+      )
+    ) {
+      return;
+    }
+
+    if (
+      !confirm(
+        'Segunda Confirmação de Segurança:\n\nTem a certeza de que pretende esvaziar a nuvem agora? Esta ação é irreversível na nuvem.'
+      )
+    ) {
+      return;
+    }
+
+    setIsClearingCloud(true);
+    try {
+      await clearCloudDataNow();
+      handleTest();
+    } finally {
+      setIsClearingCloud(false);
     }
   };
 
@@ -731,6 +760,37 @@ END $$;`;
               <span>{isImporting ? 'A carregar...' : 'Importar da Nuvem'}</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Cartão 3: Zona de Manutenção / Limpeza e Reset da Nuvem */}
+      <div className="bg-rose-950/20 border border-rose-800/40 p-6 rounded-3xl space-y-4 shadow-xl">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-white">
+                Limpar / Esvaziar Dados na Nuvem (Reset Nuvem)
+              </h3>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed max-w-xl">
+                Elimina todos os clientes, agendamentos, serviços e salões guardados na nuvem Supabase caso pretenda reiniciar testes ou esvaziar a nuvem.
+                <span className="block text-[11px] text-amber-300 mt-1 font-semibold">
+                  ⚠️ Os dados locais deste computador NÃO são afetados, apenas os dados na nuvem Supabase.
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleClearCloud}
+            disabled={isClearingCloud || !isCloudConfigured}
+            className="px-5 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-rose-600/30 shrink-0 disabled:opacity-50"
+          >
+            <Trash2 className={`w-4 h-4 ${isClearingCloud ? 'animate-spin' : ''}`} />
+            <span>{isClearingCloud ? 'A limpar nuvem...' : 'Limpar Dados na Nuvem Agora'}</span>
+          </button>
         </div>
       </div>
 

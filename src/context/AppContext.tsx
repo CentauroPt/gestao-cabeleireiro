@@ -21,7 +21,7 @@ import {
   clearActiveSession,
   onStorageSync,
 } from '../services/storageEngine';
-import { checkIsSupabaseConfigured } from '../services/supabase';
+import { checkIsSupabaseConfigured, supabaseService } from '../services/supabase';
 import {
   calculateEndTime,
   calculateDurationMinutes,
@@ -42,6 +42,7 @@ interface AppContextType {
   isCloudConfigured: boolean;
   syncCloudNow: () => Promise<boolean>;
   exportToCloudNow: () => Promise<{ success: boolean; counts?: any; errors?: string[] }>;
+  clearCloudDataNow: () => Promise<{ success: boolean; message: string }>;
   importFromCloudNow: () => Promise<boolean>;
   testCloudConnection: () => Promise<{ success: boolean; message: string; counts?: any }>;
   updateCloudCredentials: (url: string, key: string) => Promise<boolean>;
@@ -1257,6 +1258,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const clearCloudDataNow = async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await supabaseService.clearAllCloudData();
+      if (res.success) {
+        showNotification('success', res.message);
+      } else {
+        showNotification('error', res.message);
+      }
+      return res;
+    } catch (err: any) {
+      const msg = `Erro ao limpar a nuvem: ${err?.message || 'Falha de comunicação'}`;
+      showNotification('error', msg);
+      return { success: false, message: msg };
+    }
+  };
+
   const importFromCloudNow = async (): Promise<boolean> => {
     try {
       const ok = await api.pullAllFromCloudAndReplaceLocal();
@@ -1303,6 +1320,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isCloudConfigured,
         syncCloudNow,
         exportToCloudNow,
+        clearCloudDataNow,
         importFromCloudNow,
         testCloudConnection,
         updateCloudCredentials,

@@ -791,6 +791,47 @@ export class SupabaseService {
       return null;
     }
   }
+
+  /**
+   * Limpa / esvazia todos os dados operacionais da nuvem (agendamentos, clientes, serviços, utilizadores, salões).
+   * Permite ao utilizador reiniciar testes ou limpar a nuvem com total segurança.
+   */
+  async clearAllCloudData(): Promise<{ success: boolean; message: string }> {
+    if (!this.client) {
+      return { success: false, message: 'Supabase não está configurado.' };
+    }
+    try {
+      // 1. Apagar agendamentos (filho)
+      const { error: errApts } = await this.client.from('agendamentos').delete().neq('id', '___none___');
+      if (errApts) throw errApts;
+
+      // 2. Apagar clientes (filho)
+      const { error: errCli } = await this.client.from('clientes').delete().neq('id', '___none___');
+      if (errCli) throw errCli;
+
+      // 3. Apagar serviços (filho)
+      const { error: errServ } = await this.client.from('servicos').delete().neq('id', '___none___');
+      if (errServ) throw errServ;
+
+      // 4. Apagar utilizadores (filho)
+      const { error: errUsers } = await this.client.from('utilizadores').delete().neq('id', '___none___');
+      if (errUsers) throw errUsers;
+
+      // 5. Apagar salões (pai)
+      const { error: errSaloes } = await this.client.from('saloes').delete().neq('id', '___none___');
+      if (errSaloes) throw errSaloes;
+
+      return {
+        success: true,
+        message: 'Todos os registos operacionais da Nuvem Supabase foram eliminados com sucesso!',
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `Falha ao limpar nuvem: ${err?.message || 'Erro de rede ou permissões'}`,
+      };
+    }
+  }
 }
 
 export const supabaseService = new SupabaseService();
