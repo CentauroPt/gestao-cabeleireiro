@@ -29,11 +29,13 @@ import {
   Monitor,
   FileText,
   X,
+  Database,
 } from 'lucide-react';
 import { SalonCustomizationModal } from '../salon/SalonCustomizationModal';
 import { MyPaymentsView } from '../subscription/MyPaymentsView';
 import { SalonAdminsView } from './SalonAdminsView';
 import { BookingStatsView } from './BookingStatsView';
+import { CloudDatabasePanel } from '../developer/CloudDatabasePanel';
 
 type ReportTab = 'clients' | 'daily' | 'monthly' | 'staff';
 
@@ -69,7 +71,7 @@ interface SalesTransaction {
 }
 
 interface AdminReportsViewProps {
-  initialSection?: 'reports' | 'booking_stats' | 'payments' | 'admins';
+  initialSection?: 'reports' | 'booking_stats' | 'payments' | 'admins' | 'cloud_database';
 }
 
 export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSection = 'reports' }) => {
@@ -91,7 +93,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
   } = useApp();
 
   const isTrialActive = currentSalon?.estado_subscricao === 'prova' && !isSubscriptionBlocked;
-  const [adminSection, setAdminSection] = useState<'reports' | 'booking_stats' | 'payments' | 'admins'>(initialSection);
+  const [adminSection, setAdminSection] = useState<'reports' | 'booking_stats' | 'payments' | 'admins' | 'cloud_database'>(initialSection);
 
   React.useEffect(() => {
     if (initialSection) {
@@ -595,6 +597,18 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
             {salonAdmins.length}
           </span>
         </button>
+
+        <button
+          onClick={() => setAdminSection('cloud_database')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+            adminSection === 'cloud_database'
+              ? 'bg-white text-purple-700 shadow-sm border border-slate-200/60'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <Database className="w-4 h-4 shrink-0" />
+          <span>Base de Dados na Nuvem</span>
+        </button>
       </div>
 
       {adminSection === 'booking_stats' ? (
@@ -603,6 +617,8 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
         <MyPaymentsView />
       ) : adminSection === 'admins' ? (
         <SalonAdminsView />
+      ) : adminSection === 'cloud_database' ? (
+        <CloudDatabasePanel />
       ) : (
         <>
           {/* Barra Informativa quando em Modo de Pré-visualização do Relatório no Ecrã */}
