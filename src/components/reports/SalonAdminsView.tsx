@@ -11,11 +11,12 @@ import {
   CheckCircle2,
   Mail,
   Phone,
+  Trash2,
   X,
 } from 'lucide-react';
 
 export const SalonAdminsView: React.FC = () => {
-  const { currentSalon, currentUser, users, updateUser } = useApp();
+  const { currentSalon, currentUser, users, updateUser, deleteUser } = useApp();
 
   const [userToPromote, setUserToPromote] = useState<User | null>(null);
   const [promotePassword, setPromotePassword] = useState('');
@@ -69,6 +70,16 @@ export const SalonAdminsView: React.FC = () => {
       )
     ) {
       await updateUser(user.id, { role: 'COLABORADOR' });
+    }
+  };
+
+  const handleDeleteCollaborator = async (user: User) => {
+    if (
+      confirm(
+        `Tem a certeza que deseja eliminar permanentemente o colaborador "${user.name}" da equipa do salão?`
+      )
+    ) {
+      await deleteUser(user.id);
     }
   };
 
@@ -234,22 +245,33 @@ export const SalonAdminsView: React.FC = () => {
                 <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: colab.color }} />
 
                 <div>
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-xs"
-                      style={{ backgroundColor: colab.color }}
-                    >
-                      {colab.name.charAt(0)}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-900">{colab.name}</h4>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">
-                          COLABORADOR
-                        </span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-500" title="Ativo" />
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-xs"
+                        style={{ backgroundColor: colab.color }}
+                      >
+                        {colab.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900">{colab.name}</h4>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">
+                            COLABORADOR
+                          </span>
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" title="Ativo" />
+                        </div>
                       </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCollaborator(colab)}
+                      className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                      title="Apagar Colaborador"
+                    >
+                      <Trash2 className="w-4 h-4 text-rose-500 hover:text-rose-600" />
+                    </button>
                   </div>
 
                   {/* Contactos */}

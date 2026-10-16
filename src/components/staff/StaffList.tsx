@@ -8,12 +8,11 @@ import {
   Mail,
   Phone,
   Edit2,
-  Trash2,
   AlertTriangle,
 } from 'lucide-react';
 
 export const StaffList: React.FC = () => {
-  const { users, currentUser, currentSalon, deleteUser } = useApp();
+  const { users, currentUser, currentSalon } = useApp();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<User | null>(null);
@@ -24,16 +23,6 @@ export const StaffList: React.FC = () => {
   const collaborators = users.filter(
     (u) => u.salonId === currentSalon?.id && u.role !== 'ADMIN'
   );
-
-  const handleDelete = async (user: User) => {
-    if (!isAdmin) {
-      alert('Acesso negado: Apenas o Administrador do salão pode remover colaboradores.');
-      return;
-    }
-    if (confirm(`Tem a certeza que deseja remover ${user.name} da equipa do salão?`)) {
-      await deleteUser(user.id);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -147,13 +136,6 @@ export const StaffList: React.FC = () => {
                           title="Editar"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(colab)}
-                          className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
-                          title="Remover"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     )}
