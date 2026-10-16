@@ -1,8 +1,7 @@
 {
-  "name": "gestao-cabeleireiro-static",
+  "name": "salaomaster-dist",
   "private": true,
-  "version": "1.0.0",
   "scripts": {
-    "build": "echo 'Static build ready'"
+    "build": "echo 'Build already completed'"
   }
 }

@@ -1,0 +1,7 @@
+{
+  "name": "salaomaster-dist",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Build already completed'"
+  }
+}
