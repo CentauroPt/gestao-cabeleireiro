@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { SalonCustomizationModal } from '../salon/SalonCustomizationModal';
 import { MyPaymentsView } from '../subscription/MyPaymentsView';
+import { SalonAdminsView } from './SalonAdminsView';
 
 type ReportTab = 'clients' | 'daily' | 'monthly' | 'staff';
 
@@ -68,7 +69,7 @@ interface SalesTransaction {
 }
 
 interface AdminReportsViewProps {
-  initialSection?: 'reports' | 'payments';
+  initialSection?: 'reports' | 'payments' | 'admins';
 }
 
 export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSection = 'reports' }) => {
@@ -89,7 +90,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
   } = useApp();
 
   const isTrialActive = currentSalon?.estado_subscricao === 'prova' && !isSubscriptionBlocked;
-  const [adminSection, setAdminSection] = useState<'reports' | 'payments'>(initialSection);
+  const [adminSection, setAdminSection] = useState<'reports' | 'payments' | 'admins'>(initialSection);
 
   React.useEffect(() => {
     if (initialSection) {
@@ -556,7 +557,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
       </div>
 
       {/* Seletor de Módulos da Área do Administrador */}
-      <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center gap-2 border border-slate-200 print:hidden">
+      <div className="bg-slate-100 p-1.5 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 border border-slate-200 print:hidden">
         <button
           onClick={() => setAdminSection('reports')}
           className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
@@ -590,10 +591,27 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
             </span>
           )}
         </button>
+
+        <button
+          onClick={() => setAdminSection('admins')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+            adminSection === 'admins'
+              ? 'bg-white text-purple-700 shadow-sm border border-slate-200/60'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 shrink-0" />
+          <span>Gestão de Administradores</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-700 border border-purple-200">
+            {salonAdmins.length}
+          </span>
+        </button>
       </div>
 
       {adminSection === 'payments' ? (
         <MyPaymentsView />
+      ) : adminSection === 'admins' ? (
+        <SalonAdminsView />
       ) : (
         <>
           {/* Barra Informativa quando em Modo de Pré-visualização do Relatório no Ecrã */}
