@@ -156,7 +156,7 @@ export const LandingPage: React.FC = () => {
               }`}
             >
               <Lock className="w-4 h-4" />
-              <span>Entrar no meu salão</span>
+              <span>Entrar</span>
             </button>
 
             <button
@@ -169,7 +169,7 @@ export const LandingPage: React.FC = () => {
               }`}
             >
               <Store className="w-4 h-4" />
-              <span>Registar-me</span>
+              <span>Criar conta</span>
             </button>
           </div>
 
@@ -334,7 +334,7 @@ export const LandingPage: React.FC = () => {
                 disabled={isRegistering}
                 className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-sm rounded-xl transition-all shadow-md shadow-purple-200 flex items-center justify-center gap-2 cursor-pointer mt-4"
               >
-                <span>{isRegistering ? 'A registar...' : 'Registar Salão & Entrar na Agenda'}</span>
+                <span>{isRegistering ? 'A criar conta...' : 'Criar conta'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -348,7 +348,7 @@ export const LandingPage: React.FC = () => {
                   Entrar no meu Salão
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Introduza o seu e-mail, nome do salão ou telefone para aceder à sua agenda.
+                  Introduza o seu email e palavra-passe para aceder à aplicação.
                 </p>
               </div>
 
@@ -365,12 +365,12 @@ export const LandingPage: React.FC = () => {
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    E-mail, Nome do Salão ou Telefone *
+                    Email *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="ex: contacto@salao.pt, Nome do Salão ou 912345678"
+                    placeholder="ex: contacto@salao.pt"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500"
@@ -410,7 +410,7 @@ export const LandingPage: React.FC = () => {
                 disabled={isLoggingIn}
                 className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-sm rounded-xl transition-all shadow-md shadow-purple-200 flex items-center justify-center gap-2 cursor-pointer mt-4"
               >
-                <span>{isLoggingIn ? 'A verificar...' : 'Iniciar Sessão no Salão'}</span>
+                <span>{isLoggingIn ? 'A verificar...' : 'Entrar'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>

@@ -5,6 +5,7 @@ import type { SalonSummary } from '../../services/api';
 import { ClientSubscriptionDrawer } from './ClientSubscriptionDrawer';
 import { SubscriptionStatsPanel } from './SubscriptionStatsPanel';
 import { BillingConfigModal } from './BillingConfigModal';
+import { OwnerPaymentsPanel } from '../subscription/OwnerPaymentsPanel';
 import {
   Code2,
   Store,
@@ -52,7 +53,7 @@ export const DeveloperPortalView: React.FC = () => {
     billingConfig,
   } = useApp();
 
-  const [devTab, setDevTab] = useState<'salons' | 'stats'>('salons');
+  const [devTab, setDevTab] = useState<'salons' | 'stats' | 'bank_payments'>('salons');
   const [selectedSalonForSubscription, setSelectedSalonForSubscription] = useState<SalonSummary | null>(null);
   const [isBillingConfigModalOpen, setIsBillingConfigModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -530,6 +531,18 @@ export const DeveloperPortalView: React.FC = () => {
               <BarChart3 className="w-4 h-4" />
               <span>Painel de Estatísticas SaaS</span>
             </button>
+
+            <button
+              onClick={() => setDevTab('bank_payments')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                devTab === 'bank_payments'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Painel de Pagamentos Bancários</span>
+            </button>
           </div>
 
           <button
@@ -544,6 +557,8 @@ export const DeveloperPortalView: React.FC = () => {
 
         {devTab === 'stats' ? (
           <SubscriptionStatsPanel />
+        ) : devTab === 'bank_payments' ? (
+          <OwnerPaymentsPanel />
         ) : (
           <>
             {/* Global KPI Metrics Cards */}

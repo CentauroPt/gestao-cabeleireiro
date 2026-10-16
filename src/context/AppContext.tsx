@@ -357,10 +357,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     window.addEventListener('storage', handleStorageUpdate);
+    window.addEventListener('sigec_bank_unlocked', handleStorageUpdate);
     const unbind = onStorageSync(handleStorageUpdate);
 
     return () => {
       window.removeEventListener('storage', handleStorageUpdate);
+      window.removeEventListener('sigec_bank_unlocked', handleStorageUpdate);
       unbind();
     };
   }, [currentSalonId]);

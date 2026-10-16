@@ -15,6 +15,7 @@ import {
   RefreshCw,
   MessageCircle,
 } from 'lucide-react';
+import { BankPaymentBlockedScreen } from './BankPaymentBlockedScreen';
 
 interface SubscriptionLockModalProps {
   forceOpen?: boolean;
@@ -45,6 +46,7 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [unblockedSuccess, setUnblockedSuccess] = useState(false);
+  const [viewMode, setViewMode] = useState<'bank_checkout' | 'manual_transfer'>('bank_checkout');
 
   const prevBlockedRef = useRef<boolean>(isSubscriptionBlocked);
 
@@ -175,6 +177,24 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
     }
   };
 
+  if (viewMode === 'bank_checkout') {
+    return (
+      <BankPaymentBlockedScreen
+        clienteId={currentSalon?.id || 'demo-cliente'}
+        clienteNome={currentSalon?.name || 'Salão'}
+        clienteEmail={currentSalon?.email || 'contacto@salao.pt'}
+        valorAPagar={effectiveRate}
+        onUnlocked={() => {
+          setUnblockedSuccess(true);
+          refreshSubscriptionData();
+          if (onPaymentSuccess) onPaymentSuccess();
+          if (onClose) onClose();
+        }}
+        onSwitchToManual={() => setViewMode('manual_transfer')}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
@@ -235,6 +255,20 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Alternar para Gateway Bancário Online */}
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span className="text-xs text-blue-900 font-bold">
+              Prefere checkout bancário com desbloqueio automático imediato?
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewMode('bank_checkout')}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
+            >
+              Pagar agora online
+            </button>
+          </div>
 
           {/* Mensagem Principal Conforme Requisitos */}
           <div className="bg-purple-50 border border-purple-200/80 rounded-2xl p-4 text-center">
