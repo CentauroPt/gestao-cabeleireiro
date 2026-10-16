@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SalonStatus } from '../../types';
+import type { SalonStatus, SubscriptionPayment } from '../../types';
 import type { SalonSummary } from '../../services/api';
+import { ClientSubscriptionDrawer } from './ClientSubscriptionDrawer';
+import { SubscriptionStatsPanel } from './SubscriptionStatsPanel';
+import { BillingConfigModal } from './BillingConfigModal';
 import {
   Code2,
   Store,
@@ -23,6 +26,11 @@ import {
   Calendar,
   AlertTriangle,
   Info,
+  CreditCard,
+  Bell,
+  Sliders,
+  BarChart3,
+  Clock,
 } from 'lucide-react';
 
 export const DeveloperPortalView: React.FC = () => {
@@ -39,10 +47,14 @@ export const DeveloperPortalView: React.FC = () => {
     resetDemoData,
     notification,
     setNotification,
+    validateSubscriptionPayment,
   } = useApp();
 
+  const [devTab, setDevTab] = useState<'salons' | 'stats'>('salons');
+  const [selectedSalonForSubscription, setSelectedSalonForSubscription] = useState<SalonSummary | null>(null);
+  const [isBillingConfigModalOpen, setIsBillingConfigModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | SalonStatus>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | SalonStatus | 'PROVA' | 'BLOQUEADO'>('ALL');
 
   // Modal para suspender com motivo
   const [suspendingSalon, setSuspendingSalon] = useState<SalonSummary | null>(null);
@@ -120,6 +132,35 @@ export const DeveloperPortalView: React.FC = () => {
     return allSalonsSummary.reduce((acc, s) => acc + s.clientsCount, 0);
   }, [allSalonsSummary]);
 
+  // Pagamentos Pendentes de Validação (Gera Notificação na Consola)
+  const allPendingPayments = useMemo(() => {
+    const list: Array<{ payment: SubscriptionPayment; salonSummary: SalonSummary }> = [];
+    allSalonsSummary.forEach((item) => {
+      (item.payments || []).forEach((p) => {
+        if (p.estado === 'pendente') {
+          list.push({ payment: p, salonSummary: item });
+        }
+      });
+    });
+    return list;
+  }, [allSalonsSummary]);
+
+  const handleQuickValidate = async (paymentId: string) => {
+    try {
+      await validateSubscriptionPayment(paymentId, 'Validado via Notificação Rápida');
+      await refreshAllSalonsSummary();
+      setNotification({
+        type: 'success',
+        message: 'Pagamento validado com sucesso! O salão foi desbloqueado imediatamente sem retenção.',
+      });
+    } catch (e: any) {
+      setNotification({
+        type: 'error',
+        message: 'Erro ao validar pagamento: ' + (e?.message || 'Falha de comunicação'),
+      });
+    }
+  };
+
   // Lista Filtrada
   const filteredSalons = useMemo(() => {
     return allSalonsSummary.filter((item) => {
@@ -130,7 +171,14 @@ export const DeveloperPortalView: React.FC = () => {
         (item.adminUser?.name || '').toLowerCase().includes(q) ||
         (item.adminUser?.email || '').toLowerCase().includes(q);
 
-      const matchesStatus = statusFilter === 'ALL' || item.salon.status === statusFilter;
+      const matchesStatus =
+        statusFilter === 'ALL' ||
+        (statusFilter === 'ATIVO' && item.salon.status === 'ATIVO' && !item.isSubscriptionBlocked) ||
+        (statusFilter === 'SUSPENSO' && item.salon.status === 'SUSPENSO') ||
+        (statusFilter === 'CANCELADO' && item.salon.status === 'CANCELADO') ||
+        (statusFilter === 'PROVA' && item.salon.estado_subscricao === 'prova' && !item.isSubscriptionBlocked) ||
+        (statusFilter === 'BLOQUEADO' && (item.isSubscriptionBlocked || item.salon.estado_subscricao === 'bloqueado' || item.salon.status === 'SUSPENSO'));
+
       return matchesSearch && matchesStatus;
     });
   }, [allSalonsSummary, searchTerm, statusFilter]);
@@ -359,166 +407,284 @@ export const DeveloperPortalView: React.FC = () => {
           </div>
         </div>
 
-        {/* Global KPI Metrics Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-          <div className="bg-slate-800/80 border border-slate-700/80 p-4 rounded-2xl">
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-              Salões Registados
-            </div>
-            <div className="text-2xl font-black text-white">{totalSalons}</div>
-            <div className="text-[11px] text-slate-400 mt-0.5">Total na plataforma</div>
-          </div>
-
-          <div className="bg-slate-800/80 border border-emerald-500/30 p-4 rounded-2xl">
-            <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Salões Ativos
-            </div>
-            <div className="text-2xl font-black text-emerald-400">{activeSalonsCount}</div>
-            <div className="text-[11px] text-emerald-500/80 mt-0.5">Operacionais</div>
-          </div>
-
-          <div className="bg-slate-800/80 border border-amber-500/30 p-4 rounded-2xl">
-            <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <PauseCircle className="w-3 h-3" /> Suspensos
-            </div>
-            <div className="text-2xl font-black text-amber-400">{suspendedSalonsCount}</div>
-            <div className="text-[11px] text-amber-500/80 mt-0.5">Bloqueados temp.</div>
-          </div>
-
-          <div className="bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl">
-            <div className="text-[11px] font-bold text-rose-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <XCircle className="w-3 h-3" /> Cancelados
-            </div>
-            <div className="text-2xl font-black text-rose-400">{canceledSalonsCount}</div>
-            <div className="text-[11px] text-rose-500/80 mt-0.5">Sem subscrição</div>
-          </div>
-
-          <div className="bg-slate-800/80 border border-purple-500/30 p-4 rounded-2xl col-span-2 sm:col-span-1">
-            <div className="text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <Euro className="w-3 h-3" /> Faturação Global
-            </div>
-            <div className="text-2xl font-black text-white">{totalGlobalRevenue.toFixed(2)}€</div>
-            <div className="text-[11px] text-purple-300 mt-0.5">{totalGlobalStaff} colaboradores • {totalGlobalClients} clientes</div>
-          </div>
-        </div>
-
-        {/* Master Salons Management Table */}
-        <div className="bg-slate-800/90 border border-slate-700 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <Store className="w-5 h-5 text-purple-400" />
-                Gestão Master de Todos os Salões Registados
-              </h2>
-              <p className="text-xs text-slate-400">
-                Pode suspender, reativar, cancelar ou inspecionar cada salão individualmente.
-              </p>
+        {/* Notificação de Novos Pagamentos Recebidos */}
+        {allPendingPayments.length > 0 && (
+          <div className="bg-gradient-to-r from-amber-950/90 to-amber-900/90 border border-amber-500/50 p-4.5 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-amber-200 animate-in slide-in-from-top-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                <Bell className="w-5 h-5 animate-bounce" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-500/40">
+                    Notificação de Pagamento
+                  </span>
+                  <span className="text-xs font-black text-white">
+                    {allPendingPayments.length} novo(s) pagamento(s) recebido(s)!
+                  </span>
+                </div>
+                <p className="text-xs text-amber-300/80 mt-0.5">
+                  Existem comprovativos enviados pelos clientes a aguardar validação para desbloqueio imediato.
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Barra de Pesquisa */}
-              <div className="relative min-w-[200px]">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Pesquisar salão..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-purple-500"
-                />
-              </div>
-
-              {/* Filtro de Estado */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none cursor-pointer"
-              >
-                <option value="ALL">Todos os Estados</option>
-                <option value="ATIVO">Apenas Ativos</option>
-                <option value="SUSPENSO">Apenas Suspensos</option>
-                <option value="CANCELADO">Apenas Cancelados</option>
-              </select>
+              {allPendingPayments.slice(0, 3).map(({ payment, salonSummary }) => (
+                <div
+                  key={payment.id}
+                  className="bg-slate-900/90 border border-amber-500/40 px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs"
+                >
+                  <span className="font-bold text-white">{salonSummary.salon.name}</span>
+                  <span className="text-amber-400 font-black">{payment.valor.toFixed(2)}€</span>
+                  <span className="text-[10px] text-slate-400">
+                    ({payment.metodo === 'transferencia' ? 'Transf.' : 'MB Way'})
+                  </span>
+                  <button
+                    onClick={() => handleQuickValidate(payment.id)}
+                    className="ml-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] rounded-lg transition-colors cursor-pointer shadow-xs"
+                    title="Validar e desbloquear imediatamente"
+                  >
+                    Validar
+                  </button>
+                  <button
+                    onClick={() => setSelectedSalonForSubscription(salonSummary)}
+                    className="px-2 py-1 text-slate-400 hover:text-white text-[11px] font-bold cursor-pointer"
+                    title="Abrir ficha de subscrição"
+                  >
+                    Ficha
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
+        )}
 
-          {/* Tabela dos Salões */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-700 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-900/40">
-                  <th className="py-3 px-3">Salão & Identificação</th>
-                  <th className="py-3 px-3">Data de Registo</th>
-                  <th className="py-3 px-3">Estado</th>
-                  <th className="py-3 px-3">Administrador</th>
-                  <th className="py-3 px-3 text-center">Colaboradores</th>
-                  <th className="py-3 px-3 text-center">Clientes</th>
-                  <th className="py-3 px-3 text-right">Faturação Total</th>
-                  <th className="py-3 px-3 text-right">Ações do Programador</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/60 text-xs text-slate-300">
-                {filteredSalons.map((item) => {
-                  const s = item.salon;
-                  const isAtivo = s.status === 'ATIVO';
-                  const isSuspenso = s.status === 'SUSPENSO';
-                  const isCancelado = s.status === 'CANCELADO';
-                  const formattedRegDate = s.createdAt
-                    ? new Date(s.createdAt).toLocaleDateString('pt-PT', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                      })
-                    : '—';
+        {/* Barra de Navegação entre Separadores da Consola */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDevTab('salons')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                devTab === 'salons'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+            >
+              <Store className="w-4 h-4" />
+              <span>Salões Registados</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-black/25 text-[10px] font-mono">
+                {totalSalons}
+              </span>
+            </button>
 
-                  return (
-                    <tr key={s.id} className="hover:bg-slate-700/30 transition-colors">
-                      {/* Salão */}
-                      <td className="py-3 px-3">
-                        <div className="font-bold text-white text-sm">{s.name}</div>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                          <MapPin className="w-3 h-3 text-slate-500" />
-                          <span>{s.address}</span>
-                          {s.nif && <span>• NIF: {s.nif}</span>}
-                        </div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">
-                          ID: <code className="bg-slate-900 px-1 rounded text-purple-300 font-mono">{s.id}</code>
-                        </div>
-                      </td>
+            <button
+              onClick={() => setDevTab('stats')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                devTab === 'stats'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Painel de Estatísticas SaaS</span>
+            </button>
+          </div>
 
-                      {/* Data de Registo */}
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1.5 text-slate-200 font-semibold">
-                          <Calendar className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                          <span>{formattedRegDate}</span>
-                        </div>
-                      </td>
+          <button
+            onClick={() => setIsBillingConfigModalOpen(true)}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto shadow-xs"
+            title="Configurar IBAN, MB Way e WhatsApp de faturação"
+          >
+            <Sliders className="w-4 h-4" />
+            <span>Configuração Bancária & Preços</span>
+          </button>
+        </div>
 
-                      {/* Estado */}
-                      <td className="py-3 px-3">
-                        {isAtivo && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            <CheckCircle2 className="w-3 h-3" /> Ativo
-                          </span>
-                        )}
-                        {isSuspenso && (
-                          <div>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              <PauseCircle className="w-3 h-3" /> Suspenso
-                            </span>
-                            {s.suspensionReason && (
-                              <p className="text-[10px] text-amber-400/80 mt-1 max-w-[180px]">
-                                {s.suspensionReason}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        {isCancelado && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                            <XCircle className="w-3 h-3" /> Cancelado
-                          </span>
-                        )}
-                      </td>
+        {devTab === 'stats' ? (
+          <SubscriptionStatsPanel />
+        ) : (
+          <>
+            {/* Global KPI Metrics Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+              <div className="bg-slate-800/80 border border-slate-700/80 p-4 rounded-2xl">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Salões Registados
+                </div>
+                <div className="text-2xl font-black text-white">{totalSalons}</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">Total na plataforma</div>
+              </div>
+
+              <div className="bg-slate-800/80 border border-emerald-500/30 p-4 rounded-2xl">
+                <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Salões Ativos
+                </div>
+                <div className="text-2xl font-black text-emerald-400">{activeSalonsCount}</div>
+                <div className="text-[11px] text-emerald-500/80 mt-0.5">Operacionais</div>
+              </div>
+
+              <div className="bg-slate-800/80 border border-amber-500/30 p-4 rounded-2xl">
+                <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <PauseCircle className="w-3 h-3" /> Suspensos
+                </div>
+                <div className="text-2xl font-black text-amber-400">{suspendedSalonsCount}</div>
+                <div className="text-[11px] text-amber-500/80 mt-0.5">Bloqueados temp.</div>
+              </div>
+
+              <div className="bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl">
+                <div className="text-[11px] font-bold text-rose-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <XCircle className="w-3 h-3" /> Cancelados
+                </div>
+                <div className="text-2xl font-black text-rose-400">{canceledSalonsCount}</div>
+                <div className="text-[11px] text-rose-500/80 mt-0.5">Sem subscrição</div>
+              </div>
+
+              <div className="bg-slate-800/80 border border-purple-500/30 p-4 rounded-2xl col-span-2 sm:col-span-1">
+                <div className="text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Euro className="w-3 h-3" /> Faturação Global
+                </div>
+                <div className="text-2xl font-black text-white">{totalGlobalRevenue.toFixed(2)}€</div>
+                <div className="text-[11px] text-purple-300 mt-0.5">{totalGlobalStaff} colaboradores • {totalGlobalClients} clientes</div>
+              </div>
+            </div>
+
+            {/* Master Salons Management Table */}
+            <div className="bg-slate-800/90 border border-slate-700 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Store className="w-5 h-5 text-purple-400" />
+                    Gestão Master de Todos os Salões Registados
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Pode gerir subscrições, suspender, reativar, cancelar ou inspecionar cada salão individualmente.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Barra de Pesquisa */}
+                  <div className="relative min-w-[200px]">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Pesquisar salão..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  {/* Filtro de Estado */}
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className="px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none cursor-pointer"
+                  >
+                    <option value="ALL">Todos os Estados</option>
+                    <option value="ATIVO">Subscrição Ativa</option>
+                    <option value="PROVA">Em Período de Teste</option>
+                    <option value="BLOQUEADO">Bloqueados / Pag. Pendente</option>
+                    <option value="SUSPENSO">Suspensos Manualmente</option>
+                    <option value="CANCELADO">Cancelados</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tabela dos Salões */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-700 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-900/40">
+                      <th className="py-3 px-3">Salão & Identificação</th>
+                      <th className="py-3 px-3">Data de Registo</th>
+                      <th className="py-3 px-3">Subscrição & Estado</th>
+                      <th className="py-3 px-3">Administrador</th>
+                      <th className="py-3 px-3 text-center">Colaboradores</th>
+                      <th className="py-3 px-3 text-center">Clientes</th>
+                      <th className="py-3 px-3 text-right">Faturação Total</th>
+                      <th className="py-3 px-3 text-right">Ações do Programador</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/60 text-xs text-slate-300">
+                    {filteredSalons.map((item) => {
+                      const s = item.salon;
+                      const isAtivo = s.status === 'ATIVO';
+                      const isSuspenso = s.status === 'SUSPENSO';
+                      const isCancelado = s.status === 'CANCELADO';
+                      const isBlocked = item.isSubscriptionBlocked;
+                      const isTrial = s.estado_subscricao === 'prova';
+                      const pendingCount = item.pendingPaymentsCount || 0;
+                      const formattedRegDate = s.createdAt
+                        ? new Date(s.createdAt).toLocaleDateString('pt-PT', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })
+                        : '—';
+
+                      return (
+                        <tr key={s.id} className="hover:bg-slate-700/30 transition-colors">
+                          {/* Salão */}
+                          <td className="py-3 px-3">
+                            <div className="font-bold text-white text-sm">{s.name}</div>
+                            <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                              <MapPin className="w-3 h-3 text-slate-500" />
+                              <span>{s.address}</span>
+                              {s.nif && <span>• NIF: {s.nif}</span>}
+                            </div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                              ID: <code className="bg-slate-900 px-1 rounded text-purple-300 font-mono">{s.id}</code>
+                            </div>
+                          </td>
+
+                          {/* Data de Registo */}
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 text-slate-200 font-semibold">
+                              <Calendar className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                              <span>{formattedRegDate}</span>
+                            </div>
+                          </td>
+
+                          {/* Subscrição & Estado */}
+                          <td className="py-3 px-3">
+                            <div className="space-y-1">
+                              {pendingCount > 0 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                                  <Bell className="w-3 h-3 text-amber-400" />
+                                  <span>{pendingCount} Pag. Pendente</span>
+                                </span>
+                              )}
+
+                              {isBlocked ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                  <AlertTriangle className="w-3 h-3 text-rose-400" /> Bloqueado
+                                </span>
+                              ) : isTrial ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                  <Clock className="w-3 h-3 text-indigo-400" /> Prova ({item.daysRemainingInTrial ?? 0}d)
+                                </span>
+                              ) : isAtivo ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  <CheckCircle2 className="w-3 h-3" /> Ativo • {(s.valor_mensal || 29).toFixed(0)}€/mês
+                                </span>
+                              ) : isSuspenso ? (
+                                <div>
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    <PauseCircle className="w-3 h-3" /> Suspenso
+                                  </span>
+                                  {s.suspensionReason && (
+                                    <p className="text-[10px] text-amber-400/80 mt-1 max-w-[180px]">
+                                      {s.suspensionReason}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : isCancelado ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                  <XCircle className="w-3 h-3" /> Cancelado
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
 
                       {/* Administrador */}
                       <td className="py-3 px-3">
@@ -594,6 +760,16 @@ export const DeveloperPortalView: React.FC = () => {
                             </button>
                           )}
 
+                          {/* Ficha de Subscrição SaaS */}
+                          <button
+                            onClick={() => setSelectedSalonForSubscription(item)}
+                            className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-purple-500/40"
+                            title="Abrir Ficha de Subscrição do Cliente"
+                          >
+                            <CreditCard className="w-3 h-3" />
+                            <span>Subscrição</span>
+                          </button>
+
                           {/* Alterar Palavra-passe do Salão */}
                           <button
                             onClick={() => {
@@ -637,6 +813,8 @@ export const DeveloperPortalView: React.FC = () => {
             </table>
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Modal de Suspensão com Motivo */}
@@ -1016,6 +1194,19 @@ export const DeveloperPortalView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal Ficha de Subscrição do Cliente */}
+      {selectedSalonForSubscription && (
+        <ClientSubscriptionDrawer
+          salonSummary={selectedSalonForSubscription}
+          onClose={() => setSelectedSalonForSubscription(null)}
+        />
+      )}
+
+      {/* Modal de Configurações Bancárias de Faturação */}
+      {isBillingConfigModalOpen && (
+        <BillingConfigModal onClose={() => setIsBillingConfigModalOpen(false)} />
       )}
     </div>
   );

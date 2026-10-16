@@ -9,6 +9,9 @@ import { ServiceList } from './components/services/ServiceList';
 import { AdminReportsView } from './components/reports/AdminReportsView';
 import { LandingPage } from './components/auth/LandingPage';
 import { DeveloperPortalView } from './components/developer/DeveloperPortalView';
+import { MyPaymentsView } from './components/subscription/MyPaymentsView';
+import { SubscriptionLockModal } from './components/subscription/SubscriptionLockModal';
+import { WhatsAppFloatingButton } from './components/subscription/WhatsAppFloatingButton';
 import type { Client } from './types';
 
 const MainContent: React.FC = () => {
@@ -47,7 +50,7 @@ const MainContent: React.FC = () => {
 
   return (
     <div
-      className="salon-theme min-h-screen flex flex-col bg-slate-50"
+      className="salon-theme min-h-screen flex flex-col bg-slate-50 relative"
       style={{
         '--salon-primary': salonPrimary,
         '--salon-primary-shadow': `${salonPrimary}40`,
@@ -76,9 +79,17 @@ const MainContent: React.FC = () => {
 
           {activeTab === 'reports' && currentUser?.role === 'ADMIN' && <AdminReportsView />}
 
+          {activeTab === 'payments' && currentUser?.role === 'ADMIN' && <MyPaymentsView />}
+
           {activeTab === 'staff' && <StaffList />}
         </main>
       </div>
+
+      {/* Modal de bloqueio de subscrição caso o teste tenha terminado ou mensalidade pendente */}
+      <SubscriptionLockModal />
+
+      {/* Botão flutuante de contacto por WhatsApp */}
+      <WhatsAppFloatingButton />
     </div>
   );
 };

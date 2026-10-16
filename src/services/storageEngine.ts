@@ -15,6 +15,8 @@ export const STORAGE_KEYS = {
   APPOINTMENTS: 'salao_app_appointments',
   DEV_PASSWORD: 'salao_app_dev_password',
   SESSION: 'salao_app_active_session',
+  SUBSCRIPTION_PAYMENTS: 'salao_app_subscription_payments',
+  BILLING_CONFIG: 'salao_app_billing_config',
 } as const;
 
 export interface ActiveSession {
@@ -222,6 +224,7 @@ export async function syncAndMergeStorage(): Promise<boolean> {
       STORAGE_KEYS.SERVICES,
       STORAGE_KEYS.CLIENTS,
       STORAGE_KEYS.APPOINTMENTS,
+      STORAGE_KEYS.SUBSCRIPTION_PAYMENTS,
     ];
 
     for (const key of keysToCheck) {

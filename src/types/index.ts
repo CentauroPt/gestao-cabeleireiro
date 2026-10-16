@@ -1,8 +1,10 @@
 export type Role = 'ADMIN' | 'COLABORADOR';
 
-export type TabType = 'calendar' | 'clients' | 'staff' | 'services' | 'reports';
+export type TabType = 'calendar' | 'services' | 'clients' | 'staff' | 'reports' | 'payments';
 
 export type SalonStatus = 'ATIVO' | 'SUSPENSO' | 'CANCELADO';
+
+export type SubscriptionStatus = 'ativo' | 'bloqueado' | 'prova';
 
 export interface Salon {
   id: string;
@@ -19,7 +21,17 @@ export interface Salon {
   logoUrl?: string; // Logótipo personalizado do salão
   primaryColor?: string; // Cor principal personalizada do salão (Hex)
   startDayOfWeek?: number; // Dia de início da semana (0 = Domingo, 1 = Segunda, 2 = Terça, ..., 6 = Sábado; padrão: 1)
+  
+  // Dados de Subscrição SaaS
+  email?: string;
+  data_registo?: string; // Data de registo do salão (ISO)
+  fim_prova?: string; // Data de fim do período de teste de 30 dias (ISO = registo + 30d)
+  valor_mensal?: number; // Valor da subscrição mensal em Euros (ex: 29.00)
+  estado_subscricao?: SubscriptionStatus; // 'ativo' | 'bloqueado' | 'prova'
+  ultimo_mes_pago?: string; // Mês do último pagamento validado (ex: "2026-10")
 }
+
+export * from './subscription';
 
 export interface User {
   id: string;

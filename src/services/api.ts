@@ -1,4 +1,16 @@
-import type { Salon, SalonStatus, User, Service, Client, Appointment } from '../types';
+import type {
+  Salon,
+  SalonStatus,
+  User,
+  Service,
+  Client,
+  Appointment,
+  SubscriptionPayment,
+  PaymentMethod,
+  BillingConfig,
+  SubscriptionStats,
+  SubscriptionStatus,
+} from '../types';
 import {
   STORAGE_KEYS,
   loadFromLocalStorage,
@@ -7,6 +19,7 @@ import {
   syncAndMergeStorage,
   onStorageSync,
 } from './storageEngine';
+import { supabaseService } from './supabase';
 
 export interface SalonSummary {
   salon: Salon;
@@ -15,6 +28,11 @@ export interface SalonSummary {
   clientsCount: number;
   appointmentsCount: number;
   totalRevenue: number;
+  payments?: SubscriptionPayment[];
+  pendingPaymentsCount?: number;
+  isSubscriptionBlocked?: boolean;
+  subscriptionBlockReason?: string | null;
+  daysRemainingInTrial?: number;
 }
 
 export class ApiService {
@@ -23,6 +41,13 @@ export class ApiService {
   private services: Service[] = [];
   private clients: Client[] = [];
   private appointments: Appointment[] = [];
+  private subscriptionPayments: SubscriptionPayment[] = [];
+  private billingConfig: BillingConfig = {
+    iban: 'PT50 0033 0000 4523 4567 8901 2',
+    numero_mbway: '912 345 678',
+    numero_whatsapp: '+351 912 345 678',
+    valor_mensal_padrao: 29.00,
+  };
 
   // URL base configurável para o backend no servidor do utilizador
   private baseUrl = import.meta.env?.VITE_API_BASE_URL || '';
@@ -48,18 +73,38 @@ export class ApiService {
    * para assegurar que múltiplas abas ou sessões nunca usem cache desatualizada.
    */
   public reloadFromStorage(): void {
-    this.salons = loadFromLocalStorage<Salon>(STORAGE_KEYS.SALONS, []).map((s) => ({
-      ...s,
-      status: s.status || 'ATIVO',
-      primaryColor: s.primaryColor || '#8B5CF6',
-      createdAt: s.createdAt || new Date().toISOString(),
-      startDayOfWeek: s.startDayOfWeek !== undefined ? s.startDayOfWeek : 1,
-    }));
+    const rawSalons = loadFromLocalStorage<Salon>(STORAGE_KEYS.SALONS, []);
+    this.salons = rawSalons.map((s) => {
+      const regDate = s.data_registo || s.createdAt || new Date().toISOString();
+      const trialEnd = s.fim_prova || new Date(new Date(regDate).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      return {
+        ...s,
+        status: s.status || 'ATIVO',
+        primaryColor: s.primaryColor || '#8B5CF6',
+        createdAt: s.createdAt || regDate,
+        startDayOfWeek: s.startDayOfWeek !== undefined ? s.startDayOfWeek : 1,
+        data_registo: regDate,
+        fim_prova: trialEnd,
+        valor_mensal: s.valor_mensal !== undefined ? Number(s.valor_mensal) : 29.00,
+        estado_subscricao: (s.estado_subscricao as SubscriptionStatus) || 'prova',
+      };
+    });
 
     this.users = loadFromLocalStorage<User>(STORAGE_KEYS.USERS, []);
     this.services = loadFromLocalStorage<Service>(STORAGE_KEYS.SERVICES, []);
     this.clients = loadFromLocalStorage<Client>(STORAGE_KEYS.CLIENTS, []);
     this.appointments = loadFromLocalStorage<Appointment>(STORAGE_KEYS.APPOINTMENTS, []);
+    this.subscriptionPayments = loadFromLocalStorage<SubscriptionPayment>(
+      STORAGE_KEYS.SUBSCRIPTION_PAYMENTS,
+      []
+    );
+
+    try {
+      const savedConfig = localStorage.getItem(STORAGE_KEYS.BILLING_CONFIG);
+      if (savedConfig) {
+        this.billingConfig = { ...this.billingConfig, ...JSON.parse(savedConfig) };
+      }
+    } catch {}
   }
 
   getBaseUrl(): string {
@@ -128,9 +173,14 @@ export class ApiService {
     }
 
     const salonId = `salon-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    const trialEndIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const defaultRate = this.billingConfig.valor_mensal_padrao || 29.0;
+
     const newSalon: Salon = {
       id: salonId,
       name: cleanSalonName,
+      email: cleanEmail,
       phone: params.phone.trim(),
       address: params.address.trim(),
       nif: params.nif?.trim() || '',
@@ -138,9 +188,14 @@ export class ApiService {
       closingTime: params.closingTime || '20:00',
       slotIntervalMinutes: 10,
       status: 'ATIVO',
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso,
       primaryColor: '#8B5CF6',
       startDayOfWeek: 1,
+      // Faturação e Subscrição SaaS
+      data_registo: nowIso,
+      fim_prova: trialEndIso,
+      valor_mensal: defaultRate,
+      estado_subscricao: 'prova',
     };
 
     // Criar Administrador Inicial do novo salão
@@ -196,6 +251,9 @@ export class ApiService {
       { key: STORAGE_KEYS.SERVICES, data: this.services },
     ]);
 
+    // Sincronização em segundo plano com o Supabase
+    supabaseService.syncClient(newSalon).catch(() => {});
+
     return { salon: newSalon, adminUser };
   }
 
@@ -222,6 +280,7 @@ export class ApiService {
     this.services = this.services.filter((s) => s.salonId !== salonId);
     this.clients = this.clients.filter((c) => c.salonId !== salonId);
     this.appointments = this.appointments.filter((a) => a.salonId !== salonId);
+    this.subscriptionPayments = this.subscriptionPayments.filter((p) => p.cliente_id !== salonId);
 
     saveMultipleToStorage([
       { key: STORAGE_KEYS.SALONS, data: this.salons },
@@ -229,6 +288,7 @@ export class ApiService {
       { key: STORAGE_KEYS.SERVICES, data: this.services },
       { key: STORAGE_KEYS.CLIENTS, data: this.clients },
       { key: STORAGE_KEYS.APPOINTMENTS, data: this.appointments },
+      { key: STORAGE_KEYS.SUBSCRIPTION_PAYMENTS, data: this.subscriptionPayments },
     ]);
   }
 
@@ -317,6 +377,9 @@ export class ApiService {
       }
 
       const revenueFromClients = salonClients.reduce((acc, c) => acc + (c.totalSpent || 0), 0);
+      const payments = this.subscriptionPayments.filter((p) => p.cliente_id === salon.id);
+      const pendingPaymentsCount = payments.filter((p) => p.estado === 'pendente').length;
+      const subCheck = this.checkSalonSubscription(salon.id);
 
       return {
         salon,
@@ -325,6 +388,11 @@ export class ApiService {
         clientsCount: salonClients.length,
         appointmentsCount: salonAppointments.length,
         totalRevenue: revenueFromClients,
+        payments,
+        pendingPaymentsCount,
+        isSubscriptionBlocked: subCheck.isBlocked,
+        subscriptionBlockReason: subCheck.reason,
+        daysRemainingInTrial: subCheck.daysRemainingInTrial,
       };
     });
   }
@@ -783,6 +851,326 @@ export class ApiService {
     }
   }
 
+  // ==========================================
+  // FATURAÇÃO E SUBSCRIÇÕES SAAS (MENSALIDADES)
+  // ==========================================
+
+  // Verificação e Validação do Estado da Subscrição SaaS
+  checkSalonSubscription(salonId: string): {
+    isBlocked: boolean;
+    reason: 'prova_expirada' | 'mensalidade_pendente' | 'bloqueado_manual' | null;
+    daysRemainingInTrial: number;
+    monthlyRate: number;
+    hasPendingPayment: boolean;
+  } {
+    const salon = this.salons.find((s) => s.id === salonId);
+    const defaultRate = this.billingConfig.valor_mensal_padrao || 29.0;
+    if (!salon) {
+      return {
+        isBlocked: false,
+        reason: null,
+        daysRemainingInTrial: 30,
+        monthlyRate: defaultRate,
+        hasPendingPayment: false,
+      };
+    }
+
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const monthlyRate = salon.valor_mensal !== undefined ? Number(salon.valor_mensal) : defaultRate;
+
+    const salonPayments = this.subscriptionPayments.filter((p) => p.cliente_id === salonId);
+    const hasPendingPayment = salonPayments.some((p) => p.estado === 'pendente');
+    const hasValidPaymentThisMonth = salonPayments.some(
+      (p) => p.estado === 'validado' && p.mes_referencia === currentMonth
+    );
+
+    // 1. Bloqueio manual direto pelo programador ou suspensão
+    if (salon.status === 'SUSPENSO' || salon.estado_subscricao === 'bloqueado') {
+      return {
+        isBlocked: true,
+        reason: 'bloqueado_manual',
+        daysRemainingInTrial: 0,
+        monthlyRate,
+        hasPendingPayment,
+      };
+    }
+
+    // 2. Período de Teste de 30 dias
+    const regTime = new Date(salon.data_registo || salon.createdAt || now.toISOString()).getTime();
+    const trialEndTime = salon.fim_prova ? new Date(salon.fim_prova).getTime() : regTime + 30 * 24 * 60 * 60 * 1000;
+    const diffMs = trialEndTime - now.getTime();
+    const daysRemainingInTrial = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    const isTrialExpired = diffMs <= 0;
+
+    // Se ainda está no período de teste (30 dias) e o estado for 'prova'
+    if (!isTrialExpired && salon.estado_subscricao === 'prova') {
+      return {
+        isBlocked: false,
+        reason: null,
+        daysRemainingInTrial,
+        monthlyRate,
+        hasPendingPayment,
+      };
+    }
+
+    // 3. Se já tem pagamento validado para o mês atual
+    if (hasValidPaymentThisMonth) {
+      return {
+        isBlocked: false,
+        reason: null,
+        daysRemainingInTrial: 0,
+        monthlyRate,
+        hasPendingPayment,
+      };
+    }
+
+    // Se o período de prova expirou OU se já é cliente ativo e ainda não pagou o mês corrente
+    const reason = salon.estado_subscricao === 'prova' || isTrialExpired ? 'prova_expirada' : 'mensalidade_pendente';
+    return {
+      isBlocked: true,
+      reason,
+      daysRemainingInTrial: 0,
+      monthlyRate,
+      hasPendingPayment,
+    };
+  }
+
+  // Obter Configurações Globais de Faturação
+  getBillingConfig(): BillingConfig {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.BILLING_CONFIG);
+      if (saved) {
+        this.billingConfig = { ...this.billingConfig, ...JSON.parse(saved) };
+      }
+    } catch {}
+    return { ...this.billingConfig };
+  }
+
+  // Atualizar Configurações Globais de Faturação (IBAN, MB Way, WhatsApp, Preço Padrão)
+  async updateBillingConfig(newConfig: Partial<BillingConfig>): Promise<BillingConfig> {
+    this.billingConfig = { ...this.billingConfig, ...newConfig };
+    localStorage.setItem(STORAGE_KEYS.BILLING_CONFIG, JSON.stringify(this.billingConfig));
+    await supabaseService.syncBillingConfig(this.billingConfig).catch(() => {});
+    return { ...this.billingConfig };
+  }
+
+  // Obter Pagamentos de Subscrição (todos ou filtrados por salão)
+  async getSubscriptionPayments(salonId?: string): Promise<SubscriptionPayment[]> {
+    await syncAndMergeStorage();
+    this.reloadFromStorage();
+    if (salonId) {
+      return this.subscriptionPayments.filter((p) => p.cliente_id === salonId);
+    }
+    return [...this.subscriptionPayments];
+  }
+
+  // Registar Pagamento de Subscrição pelo Cliente (Estado Inicial: Pendente)
+  async createSubscriptionPayment(params: {
+    cliente_id: string;
+    valor: number;
+    metodo: PaymentMethod;
+    mes_referencia?: string;
+    comprovativo_ref?: string;
+  }): Promise<SubscriptionPayment> {
+    await syncAndMergeStorage();
+    this.reloadFromStorage();
+
+    const salon = this.salons.find((s) => s.id === params.cliente_id);
+    if (!salon) throw new Error('Salão não encontrado.');
+
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const paymentId = `pay-${Date.now()}`;
+
+    const payment: SubscriptionPayment = {
+      id: paymentId,
+      cliente_id: salon.id,
+      cliente_nome: salon.name,
+      cliente_email: salon.email || '',
+      data: now.toISOString(),
+      valor: Number(params.valor) || salon.valor_mensal || 29.0,
+      metodo: params.metodo,
+      estado: 'pendente',
+      mes_referencia: params.mes_referencia || currentMonth,
+      comprovativo_ref: params.comprovativo_ref?.trim() || undefined,
+    };
+
+    this.subscriptionPayments.unshift(payment);
+    saveToStorage(STORAGE_KEYS.SUBSCRIPTION_PAYMENTS, this.subscriptionPayments);
+
+    // Sincronização resiliente com Supabase
+    supabaseService.syncPayment(payment).catch(() => {});
+
+    return payment;
+  }
+
+  // Validar Pagamento na Consola do Programador (Desbloqueio Imediato do Cliente)
+  async validateSubscriptionPayment(paymentId: string, notasAdmin?: string): Promise<SubscriptionPayment> {
+    await syncAndMergeStorage();
+    this.reloadFromStorage();
+
+    const pIdx = this.subscriptionPayments.findIndex((p) => p.id === paymentId);
+    if (pIdx === -1) throw new Error('Pagamento não encontrado.');
+
+    const payment = this.subscriptionPayments[pIdx];
+    const nowIso = new Date().toISOString();
+
+    payment.estado = 'validado';
+    payment.data_validacao = nowIso;
+    if (notasAdmin) payment.notas_admin = notasAdmin.trim();
+
+    // Desbloquear imediatamente o cliente sem retenção
+    const sIdx = this.salons.findIndex((s) => s.id === payment.cliente_id);
+    if (sIdx !== -1) {
+      this.salons[sIdx] = {
+        ...this.salons[sIdx],
+        estado_subscricao: 'ativo',
+        status: 'ATIVO',
+        ultimo_mes_pago: payment.mes_referencia,
+      };
+      saveToStorage(STORAGE_KEYS.SALONS, this.salons);
+      supabaseService.syncClient(this.salons[sIdx]).catch(() => {});
+    }
+
+    saveToStorage(STORAGE_KEYS.SUBSCRIPTION_PAYMENTS, this.subscriptionPayments);
+    supabaseService.syncPayment(payment).catch(() => {});
+
+    return payment;
+  }
+
+  // Atualizar Ficha de Subscrição de um Salão (Valor Mensal, Estado, Fim da Prova)
+  async updateSalonSubscription(
+    salonId: string,
+    updates: { valor_mensal?: number; estado_subscricao?: SubscriptionStatus; fim_prova?: string }
+  ): Promise<Salon> {
+    await syncAndMergeStorage();
+    this.reloadFromStorage();
+
+    const idx = this.salons.findIndex((s) => s.id === salonId);
+    if (idx === -1) throw new Error('Salão não encontrado.');
+
+    this.salons[idx] = {
+      ...this.salons[idx],
+      ...(updates.valor_mensal !== undefined ? { valor_mensal: Number(updates.valor_mensal) } : {}),
+      ...(updates.estado_subscricao ? { estado_subscricao: updates.estado_subscricao } : {}),
+      ...(updates.fim_prova ? { fim_prova: updates.fim_prova } : {}),
+    };
+
+    if (updates.estado_subscricao === 'ativo') {
+      this.salons[idx].status = 'ATIVO';
+    } else if (updates.estado_subscricao === 'bloqueado') {
+      this.salons[idx].status = 'SUSPENSO';
+    }
+
+    saveToStorage(STORAGE_KEYS.SALONS, this.salons);
+    supabaseService.syncClient(this.salons[idx]).catch(() => {});
+
+    return this.salons[idx];
+  }
+
+  // Obter Estatísticas Globais de Subscrições e Crescimento para a Consola
+  async getSubscriptionStats(): Promise<SubscriptionStats> {
+    await syncAndMergeStorage();
+    this.reloadFromStorage();
+
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const validatedPayments = this.subscriptionPayments.filter((p) => p.estado === 'validado');
+    const pendingPayments = this.subscriptionPayments.filter((p) => p.estado === 'pendente');
+
+    const totalFaturado = validatedPayments.reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
+    const faturadoMesAtual = validatedPayments
+      .filter((p) => p.mes_referencia === currentMonth)
+      .reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
+
+    let clientesAtivos = 0;
+    let clientesProva = 0;
+    let clientesBloqueados = 0;
+
+    for (const salon of this.salons) {
+      const check = this.checkSalonSubscription(salon.id);
+      if (check.isBlocked) {
+        clientesBloqueados++;
+      } else if (salon.estado_subscricao === 'prova') {
+        clientesProva++;
+      } else {
+        clientesAtivos++;
+      }
+    }
+
+    // Faturação por Mês (últimos 6 meses)
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const faturacaoPorMes: Array<{ mes: string; label: string; valor: number; count: number }> = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      const monthPayments = validatedPayments.filter((p) => p.mes_referencia === key);
+      const val = monthPayments.reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
+      faturacaoPorMes.push({
+        mes: key,
+        label,
+        valor: Math.round(val * 100) / 100,
+        count: monthPayments.length,
+      });
+    }
+
+    // Faturação por Ano (últimos 3 anos)
+    const currentYear = now.getFullYear();
+    const faturacaoPorAno: Array<{ ano: string; valor: number; count: number }> = [];
+    for (let y = currentYear - 2; y <= currentYear; y++) {
+      const yearStr = String(y);
+      const yearPayments = validatedPayments.filter((p) => (p.mes_referencia || '').startsWith(yearStr));
+      const val = yearPayments.reduce((sum, p) => sum + (Number(p.valor) || 0), 0);
+      faturacaoPorAno.push({
+        ano: yearStr,
+        valor: Math.round(val * 100) / 100,
+        count: yearPayments.length,
+      });
+    }
+
+    // Crescimento de Clientes por Mês (últimos 6 meses)
+    const crescimentoClientes: Array<{ mes: string; label: string; novos: number; total: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+
+      const novos = this.salons.filter((s) => {
+        const reg = new Date(s.data_registo || s.createdAt || 0);
+        return reg >= d && reg <= endOfMonth;
+      }).length;
+
+      const totalAteData = this.salons.filter((s) => {
+        const reg = new Date(s.data_registo || s.createdAt || 0);
+        return reg <= endOfMonth;
+      }).length;
+
+      crescimentoClientes.push({
+        mes: key,
+        label,
+        novos,
+        total: totalAteData,
+      });
+    }
+
+    return {
+      totalFaturado: Math.round(totalFaturado * 100) / 100,
+      faturadoMesAtual: Math.round(faturadoMesAtual * 100) / 100,
+      totalClientes: this.salons.length,
+      clientesAtivos,
+      clientesProva,
+      clientesBloqueados,
+      pagamentosPendentesCount: pendingPayments.length,
+      faturacaoPorMes,
+      faturacaoPorAno,
+      crescimentoClientes,
+    };
+  }
+
   // Reiniciar dados de demonstração
   resetToDefaults(): void {
     localStorage.removeItem(STORAGE_KEYS.SALONS);
@@ -790,17 +1178,20 @@ export class ApiService {
     localStorage.removeItem(STORAGE_KEYS.SERVICES);
     localStorage.removeItem(STORAGE_KEYS.CLIENTS);
     localStorage.removeItem(STORAGE_KEYS.APPOINTMENTS);
+    localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION_PAYMENTS);
     this.salons = [];
     this.users = [];
     this.services = [];
     this.clients = [];
     this.appointments = [];
+    this.subscriptionPayments = [];
     saveMultipleToStorage([
       { key: STORAGE_KEYS.SALONS, data: [] },
       { key: STORAGE_KEYS.USERS, data: [] },
       { key: STORAGE_KEYS.SERVICES, data: [] },
       { key: STORAGE_KEYS.CLIENTS, data: [] },
       { key: STORAGE_KEYS.APPOINTMENTS, data: [] },
+      { key: STORAGE_KEYS.SUBSCRIPTION_PAYMENTS, data: [] },
     ]);
   }
 }

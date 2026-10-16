@@ -1,5 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import type { Salon, SalonStatus, User, Service, Client, Appointment, TabType } from '../types';
+import type {
+  Salon,
+  SalonStatus,
+  User,
+  Service,
+  Client,
+  Appointment,
+  TabType,
+  BillingConfig,
+  SubscriptionPayment,
+  SubscriptionStats,
+  SubscriptionStatus,
+  PaymentMethod,
+} from '../types';
 import { api, type SalonSummary } from '../services/api';
 import {
   saveActiveSession,
@@ -21,6 +34,29 @@ interface AppContextType {
   setAppMode: (mode: AppMode) => void;
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
+
+  // Faturação e Subscrições SaaS (Mensalidades)
+  billingConfig: BillingConfig;
+  subscriptionPayments: SubscriptionPayment[];
+  isSubscriptionBlocked: boolean;
+  subscriptionBlockReason: 'prova_expirada' | 'mensalidade_pendente' | 'bloqueado_manual' | null;
+  daysRemainingInTrial: number;
+  monthlyRate: number;
+  hasPendingPayment: boolean;
+  createSubscriptionPayment: (params: {
+    valor: number;
+    metodo: PaymentMethod;
+    mes_referencia?: string;
+    comprovativo_ref?: string;
+  }) => Promise<boolean>;
+  validateSubscriptionPayment: (paymentId: string, notasAdmin?: string) => Promise<boolean>;
+  updateBillingConfig: (newConfig: Partial<BillingConfig>) => Promise<boolean>;
+  updateSalonSubscription: (
+    salonId: string,
+    updates: { valor_mensal?: number; estado_subscricao?: SubscriptionStatus; fim_prova?: string }
+  ) => Promise<boolean>;
+  refreshSubscriptionData: () => Promise<void>;
+  getSubscriptionStats: () => Promise<SubscriptionStats>;
 
   // Autenticação de Utilizador do Salão (Login e Logout)
   loginSalonUser: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
@@ -160,6 +196,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState<boolean>(true);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
+  // Faturação e Subscrições SaaS
+  const [billingConfig, setBillingConfig] = useState<BillingConfig>(api.getBillingConfig());
+  const [subscriptionPayments, setSubscriptionPayments] = useState<SubscriptionPayment[]>([]);
+
+  const subscriptionStatus = useMemo(() => {
+    if (!currentSalonId) {
+      return {
+        isBlocked: false,
+        reason: null as 'prova_expirada' | 'mensalidade_pendente' | 'bloqueado_manual' | null,
+        daysRemainingInTrial: 30,
+        monthlyRate: billingConfig.valor_mensal_padrao || 29.0,
+        hasPendingPayment: false,
+      };
+    }
+    return api.checkSalonSubscription(currentSalonId);
+  }, [currentSalonId, salons, subscriptionPayments, billingConfig]);
+
   const setCurrentSalonId = (id: string) => {
     setCurrentSalonIdState(id);
     if (appMode === 'salon') {
@@ -190,6 +243,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const refreshSubscriptionData = async () => {
+    try {
+      const config = api.getBillingConfig();
+      setBillingConfig(config);
+      if (currentSalonId) {
+        const payments = await api.getSubscriptionPayments(currentSalonId);
+        setSubscriptionPayments(payments);
+      } else {
+        const allPayments = await api.getSubscriptionPayments();
+        setSubscriptionPayments(allPayments);
+      }
+    } catch (e) {
+      console.error('Erro ao atualizar dados de subscrição:', e);
+    }
+  };
+
   const refreshData = async (targetSalonId?: string, targetUserId?: string) => {
     try {
       setLoading(true);
@@ -203,16 +272,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (currentSalonId !== salonId) {
           setCurrentSalonIdState(salonId);
         }
-        const [salonUsers, salonServices, salonClients, salonAppointments] = await Promise.all([
+        const [salonUsers, salonServices, salonClients, salonAppointments, salonPayments] = await Promise.all([
           api.getUsers(salonId),
           api.getServices(salonId),
           api.getClients(salonId),
           api.getAppointments(salonId),
+          api.getSubscriptionPayments(salonId),
         ]);
         setUsers(salonUsers);
         setServices(salonServices);
         setClients(salonClients);
         setAppointments(salonAppointments);
+        setSubscriptionPayments(salonPayments);
+        setBillingConfig(api.getBillingConfig());
 
         const effectiveUserId = targetUserId || currentUserId;
         const matchedUser = salonUsers.find((u) => u.id === effectiveUserId);
@@ -229,6 +301,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setServices([]);
         setClients([]);
         setAppointments([]);
+        setSubscriptionPayments([]);
       }
     } catch (err: any) {
       showNotification('error', err.message || 'Erro ao carregar dados.');
@@ -987,6 +1060,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showNotification('info', 'Dados de demonstração restaurados com sucesso.');
   };
 
+  // Ações de Faturação e Subscrição SaaS
+  const createSubscriptionPayment = async (params: {
+    valor: number;
+    metodo: PaymentMethod;
+    mes_referencia?: string;
+    comprovativo_ref?: string;
+  }): Promise<boolean> => {
+    if (!currentSalonId) return false;
+    try {
+      await api.createSubscriptionPayment({
+        cliente_id: currentSalonId,
+        valor: params.valor,
+        metodo: params.metodo,
+        mes_referencia: params.mes_referencia,
+        comprovativo_ref: params.comprovativo_ref,
+      });
+      await refreshData();
+      await refreshAllSalonsSummary();
+      showNotification('success', 'Comprovativo registado com sucesso! A aguardar validação do administrador.');
+      return true;
+    } catch (err: any) {
+      showNotification('error', err.message || 'Erro ao registar pagamento.');
+      return false;
+    }
+  };
+
+  const validateSubscriptionPayment = async (paymentId: string, notasAdmin?: string): Promise<boolean> => {
+    try {
+      await api.validateSubscriptionPayment(paymentId, notasAdmin);
+      await refreshData();
+      await refreshAllSalonsSummary();
+      showNotification('success', 'Pagamento validado com sucesso! O salão foi desbloqueado de imediato.');
+      return true;
+    } catch (err: any) {
+      showNotification('error', err.message || 'Erro ao validar pagamento.');
+      return false;
+    }
+  };
+
+  const updateBillingConfig = async (newConfig: Partial<BillingConfig>): Promise<boolean> => {
+    try {
+      const updated = await api.updateBillingConfig(newConfig);
+      setBillingConfig(updated);
+      showNotification('success', 'Configurações de faturação atualizadas com sucesso.');
+      return true;
+    } catch (err: any) {
+      showNotification('error', err.message || 'Erro ao atualizar dados de faturação.');
+      return false;
+    }
+  };
+
+  const updateSalonSubscription = async (
+    salonId: string,
+    updates: { valor_mensal?: number; estado_subscricao?: SubscriptionStatus; fim_prova?: string }
+  ): Promise<boolean> => {
+    try {
+      await api.updateSalonSubscription(salonId, updates);
+      await refreshData();
+      await refreshAllSalonsSummary();
+      showNotification('success', 'Ficha de subscrição atualizada com sucesso.');
+      return true;
+    } catch (err: any) {
+      showNotification('error', err.message || 'Erro ao atualizar subscrição.');
+      return false;
+    }
+  };
+
+  const getSubscriptionStats = async (): Promise<SubscriptionStats> => {
+    return api.getSubscriptionStats();
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -994,6 +1138,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAppMode,
         activeTab,
         setActiveTab,
+        billingConfig,
+        subscriptionPayments,
+        isSubscriptionBlocked: subscriptionStatus.isBlocked,
+        subscriptionBlockReason: subscriptionStatus.reason,
+        daysRemainingInTrial: subscriptionStatus.daysRemainingInTrial,
+        monthlyRate: subscriptionStatus.monthlyRate,
+        hasPendingPayment: subscriptionStatus.hasPendingPayment,
+        createSubscriptionPayment,
+        validateSubscriptionPayment,
+        updateBillingConfig,
+        updateSalonSubscription,
+        refreshSubscriptionData,
+        getSubscriptionStats,
         loginSalonUser,
         logoutCurrentSalon,
         isDevLoggedIn,
