@@ -12,7 +12,6 @@ import {
   Copy,
   Check,
   Key,
-  ExternalLink,
   ShieldCheck,
   Users,
   Scissors,
@@ -791,77 +790,6 @@ END $$;`;
             <Trash2 className={`w-4 h-4 ${isClearingCloud ? 'animate-spin' : ''}`} />
             <span>{isClearingCloud ? 'A limpar nuvem...' : 'Limpar Dados na Nuvem Agora'}</span>
           </button>
-        </div>
-      </div>
-
-      {/* Guia Passo a Passo de Configuração */}
-      <div className="bg-slate-800/90 border border-slate-700 p-6 rounded-3xl space-y-5 shadow-xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
-              <Database className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-black text-white">
-                Guia Rápido: Como Criar e Ligar a Base de Dados Supabase (3 Minutos)
-              </h3>
-              <p className="text-xs text-slate-400">
-                Siga estes 3 passos simples para ter a base de dados a funcionar no Vercel e em todos os dispositivos
-              </p>
-            </div>
-          </div>
-
-          <a
-            href="https://supabase.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition-colors"
-          >
-            <span>Abrir Supabase.com</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-slate-900/80 border border-slate-700/60 p-4.5 rounded-2xl space-y-2">
-            <div className="w-7 h-7 rounded-xl bg-purple-600 text-white flex items-center justify-center text-xs font-black">
-              1
-            </div>
-            <h4 className="text-xs font-black text-white">Criar Projeto no Supabase</h4>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Aceda a <b>supabase.com</b> (gratuito), crie conta e clique em <b>New Project</b>. Escolha um nome (ex: <code>SalãoMaster</code>) e uma região próxima (ex: Frankfurt).
-            </p>
-          </div>
-
-          <div className="bg-slate-900/80 border border-slate-700/60 p-4.5 rounded-2xl space-y-2 ring-1 ring-purple-500/30">
-            <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xs font-black">
-              2
-            </div>
-            <h4 className="text-xs font-black text-white">Executar o Script SQL</h4>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              No menu lateral do Supabase, clique em <b>SQL Editor</b>. Clique no botão abaixo para copiar o script completo, cole no Supabase e clique em <b>Run</b>.
-            </p>
-            <button
-              onClick={copySqlToClipboard}
-              className="mt-2 w-full py-2 px-3 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 rounded-xl text-[11px] font-black transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedSql ? 'Copiado para a Área de Transferência!' : 'Copiar Script SQL'}</span>
-            </button>
-          </div>
-
-          <div className="bg-slate-900/80 border border-slate-700/60 p-4.5 rounded-2xl space-y-2">
-            <div className="w-7 h-7 rounded-xl bg-teal-600 text-white flex items-center justify-center text-xs font-black">
-              3
-            </div>
-            <h4 className="text-xs font-black text-white">Copiar as Chaves para a Vercel</h4>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Vá a <b>Project Settings → API</b> no Supabase. No painel do seu projeto na Vercel (<b>Settings → Environment Variables</b>), adicione:
-              <br />
-              <code className="text-teal-300 text-[10px]">VITE_SUPABASE_URL</code> e{' '}
-              <code className="text-teal-300 text-[10px]">VITE_SUPABASE_ANON_KEY</code>.
-            </p>
-          </div>
         </div>
       </div>
 
