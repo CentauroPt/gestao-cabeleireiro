@@ -31,6 +31,7 @@ import {
   Sliders,
   BarChart3,
   Clock,
+  X,
 } from 'lucide-react';
 
 export const DeveloperPortalView: React.FC = () => {
@@ -187,8 +188,9 @@ export const DeveloperPortalView: React.FC = () => {
   // Lista Filtrada
   const filteredSalons = useMemo(() => {
     return allSalonsSummary.filter((item) => {
-      const q = searchTerm.toLowerCase();
+      const q = searchTerm.toLowerCase().trim();
       const matchesSearch =
+        !q ||
         item.salon.name.toLowerCase().includes(q) ||
         item.salon.address.toLowerCase().includes(q) ||
         (item.adminUser?.name || '').toLowerCase().includes(q) ||
@@ -587,6 +589,44 @@ export const DeveloperPortalView: React.FC = () => {
               </div>
             </div>
 
+            {/* Barra de Pesquisa dos Nomes dos Salões (Imediatamente acima do bloco) */}
+            <div className="bg-slate-800/90 border border-slate-700 rounded-2xl p-3.5 sm:p-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Pesquisar salão pelo nome..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-9 py-2 text-sm bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all shadow-inner"
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm('')}
+                      title="Limpar pesquisa"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer p-0.5"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 justify-between sm:justify-end text-xs text-slate-400">
+                  <span>
+                    <strong className="text-white font-bold">{filteredSalons.length}</strong>{' '}
+                    {filteredSalons.length === 1 ? 'salão registado' : 'salões registados'}
+                  </span>
+                  {searchTerm && (
+                    <span className="text-purple-300 font-semibold bg-purple-950/70 border border-purple-800/60 px-2 py-0.5 rounded-md">
+                      A filtrar por: "{searchTerm}"
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Master Salons Management Table */}
             <div className="bg-slate-800/90 border border-slate-700 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -601,23 +641,11 @@ export const DeveloperPortalView: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Barra de Pesquisa */}
-                  <div className="relative min-w-[200px]">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Pesquisar salão..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-
                   {/* Filtro de Estado */}
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as any)}
-                    className="px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none cursor-pointer"
+                    className="px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none cursor-pointer hover:border-slate-600 transition-colors"
                   >
                     <option value="ALL">Todos os Estados</option>
                     <option value="ATIVO">Subscrição Ativa</option>
