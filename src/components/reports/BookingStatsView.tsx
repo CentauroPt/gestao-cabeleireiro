@@ -37,6 +37,7 @@ export const BookingStatsView: React.FC = () => {
     const today = new Date(todayStr);
 
     return appointments.filter((apt) => {
+      if (apt.status === 'CANCELADA') return false;
       if (periodFilter === 'today') {
         return apt.date === todayStr;
       }

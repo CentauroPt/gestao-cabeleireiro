@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { VisitHistoryItem } from '../../types';
 import {
   Unlock,
   ShieldAlert,
@@ -157,60 +156,36 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
   const [filterMonth, setFilterMonth] = useState<string>('ALL');
   const [filterYear, setFilterYear] = useState<string>('ALL');
 
-  // Compilar todas as transações de vendas do salão atual
+  // Compilar todas as transações reais reservadas e faturadas a partir da agenda do salão
   const allSales = useMemo<SalesTransaction[]>(() => {
     const list: SalesTransaction[] = [];
-    const recordedIds = new Set<string>();
 
-    // 1. Extrair de todos os históricos de visitas dos clientes deste salão
-    clients.forEach((client) => {
-      client.visitHistory?.forEach((vh: VisitHistoryItem) => {
-        recordedIds.add(vh.appointmentId || vh.id);
-        const dateIso = vh.date;
-        const dateStr = dateIso.includes('T') ? dateIso.split('T')[0] : dateIso.slice(0, 10);
-        const monthStr = dateStr.slice(0, 7);
-
-        list.push({
-          id: vh.id,
-          clientId: client.id,
-          clientName: client.name,
-          date: dateIso,
-          dateStr,
-          monthStr,
-          professionalId: vh.professionalId,
-          professionalName: vh.professionalName,
-          amount: vh.amountSpent,
-          services: vh.servicesDone || [],
-          notes: vh.notes,
-        });
-      });
-    });
-
-    // 2. Adicionar marcações da agenda (Confirmadas, Agendadas e Concluídas) caso ainda não constem no histórico
+    // As reservas ativas (não canceladas) constituem a fonte única e real de faturação do salão
     appointments.forEach((apt) => {
-      if (apt.status !== 'CANCELADA' && !recordedIds.has(apt.id)) {
+      if (apt.status !== 'CANCELADA') {
         const prof = users.find((u) => u.id === apt.userId);
-        const dateStr = apt.date;
+        const client = clients.find((c) => c.id === apt.clientId);
+        const dateStr = apt.date.includes('T') ? apt.date.split('T')[0] : apt.date.slice(0, 10);
         const monthStr = dateStr.slice(0, 7);
 
         list.push({
           id: apt.id,
           clientId: apt.clientId,
-          clientName: apt.clientName,
-          date: apt.date,
+          clientName: client?.name || apt.clientName || 'Cliente',
+          date: apt.date.includes('T') ? apt.date : `${apt.date}T${apt.startTime || '00:00'}:00`,
           dateStr,
           monthStr,
           professionalId: apt.userId,
           professionalName: prof?.name || 'Profissional',
-          amount: apt.totalPrice,
-          services: apt.serviceNames,
+          amount: Number(apt.totalPrice) || 0,
+          services: apt.serviceNames || [],
           notes: apt.notes,
         });
       }
     });
 
     return list.sort((a, b) => b.date.localeCompare(a.date));
-  }, [clients, appointments, users]);
+  }, [appointments, clients, users]);
 
   // Anos disponíveis para filtro
   const availableYears = useMemo(() => {

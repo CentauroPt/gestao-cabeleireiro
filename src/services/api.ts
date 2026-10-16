@@ -10,6 +10,7 @@ import type {
   BillingConfig,
   SubscriptionStats,
   SubscriptionStatus,
+  VisitHistoryItem,
 } from '../types';
 import {
   STORAGE_KEYS,
@@ -114,10 +115,74 @@ export class ApiService {
     this.services = loadFromLocalStorage<Service>(STORAGE_KEYS.SERVICES, []);
     this.clients = loadFromLocalStorage<Client>(STORAGE_KEYS.CLIENTS, []);
     this.appointments = loadFromLocalStorage<Appointment>(STORAGE_KEYS.APPOINTMENTS, []);
+    this.reconcileClientVisits();
     this.subscriptionPayments = loadFromLocalStorage<SubscriptionPayment>(
       STORAGE_KEYS.SUBSCRIPTION_PAYMENTS,
       []
     );
+  }
+
+  /**
+   * Reconcilia e sincroniza o histórico de visitas e o total faturado por cliente com as reservas reais existentes.
+   * Assegura que o histórico e valores correspondem 100% à realidade das marcações sem fantasmas ou duplicações.
+   */
+  public reconcileClientVisits(): void {
+    let changed = false;
+    for (const client of this.clients) {
+      // Obter todas as marcações reais ativas desta ficha de cliente
+      const clientApts = this.appointments.filter(
+        (a) => a.clientId === client.id && a.status !== 'CANCELADA'
+      );
+
+      const realTotalSpent = clientApts.reduce((sum, a) => sum + (Number(a.totalPrice) || 0), 0);
+
+      // Reconstruir lista ordenada cronologicamente (da mais recente para a mais antiga)
+      const realVisits: VisitHistoryItem[] = clientApts
+        .slice()
+        .sort((a, b) => {
+          const dtA = (a.date || '') + (a.startTime || '');
+          const dtB = (b.date || '') + (b.startTime || '');
+          return dtB.localeCompare(dtA);
+        })
+        .map((a) => {
+          const prof = this.users.find((u) => u.id === a.userId);
+          return {
+            id: `vh-${a.id}`,
+            appointmentId: a.id,
+            date: a.date.includes('T') ? a.date : `${a.date}T${a.startTime || '00:00'}:00`,
+            servicesDone: a.serviceNames || [],
+            professionalId: a.userId,
+            professionalName: prof?.name || 'Profissional',
+            amountSpent: Number(a.totalPrice) || 0,
+            notes: a.notes,
+          };
+        });
+
+      if (client.totalSpent !== realTotalSpent) {
+        client.totalSpent = realTotalSpent;
+        changed = true;
+      }
+
+      const currentVisits = client.visitHistory || [];
+      const needsHistoryUpdate =
+        currentVisits.length !== realVisits.length ||
+        realVisits.some((rv, i) => {
+          const cv = currentVisits[i];
+          return !cv || cv.appointmentId !== rv.appointmentId || cv.amountSpent !== rv.amountSpent;
+        });
+
+      if (needsHistoryUpdate) {
+        client.visitHistory = realVisits;
+        if (realVisits.length > 0) {
+          client.lastVisitDate = realVisits[0].date;
+        }
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      saveToStorage(STORAGE_KEYS.CLIENTS, this.clients);
+    }
   }
  
   /**
@@ -891,6 +956,7 @@ export class ApiService {
     };
     this.appointments.push(newAppointment);
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
+    this.reconcileClientVisits();
     return newAppointment;
   }
 
@@ -901,6 +967,7 @@ export class ApiService {
 
     this.appointments[index] = { ...this.appointments[index], ...data };
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
+    this.reconcileClientVisits();
     return this.appointments[index];
   }
 
@@ -916,34 +983,18 @@ export class ApiService {
 
     this.appointments = this.appointments.filter((a) => a.id !== id);
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments, true);
+    this.reconcileClientVisits();
   }
 
-  // Concluir serviço e lançar automaticamente no histórico do cliente
-  async completeAppointment(_currentUserRole: string, appointmentId: string, professionalName: string): Promise<void> {
+  // Concluir serviço e sincronizar automaticamente no histórico do cliente
+  async completeAppointment(_currentUserRole: string, appointmentId: string, _professionalName: string): Promise<void> {
     this.reloadFromStorage();
     const apt = this.appointments.find((a) => a.id === appointmentId);
     if (!apt) throw new Error('Reserva não encontrada.');
 
     apt.status = 'CONCLUIDA';
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
-
-    const client = this.clients.find((c) => c.id === apt.clientId);
-    if (client) {
-      const nowIso = new Date().toISOString();
-      client.lastVisitDate = nowIso;
-      client.totalSpent = (client.totalSpent || 0) + apt.totalPrice;
-      client.visitHistory.unshift({
-        id: `vh-${Date.now()}`,
-        appointmentId: apt.id,
-        date: nowIso,
-        servicesDone: apt.serviceNames,
-        professionalId: apt.userId,
-        professionalName: professionalName,
-        amountSpent: apt.totalPrice,
-        notes: apt.notes,
-      });
-      saveToStorage(STORAGE_KEYS.CLIENTS, this.clients);
-    }
+    this.reconcileClientVisits();
   }
 
   // ==========================================
