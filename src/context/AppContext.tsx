@@ -139,6 +139,10 @@ interface AppContextType {
       adminPassword?: string;
       openingTime?: string;
       closingTime?: string;
+      valor_mensal?: number;
+      trialDays?: number;
+      fim_prova?: string;
+      estado_subscricao?: SubscriptionStatus;
     },
     options?: { stayInCurrentMode?: boolean }
   ) => Promise<boolean>;
@@ -851,6 +855,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       adminPassword?: string;
       openingTime?: string;
       closingTime?: string;
+      valor_mensal?: number;
+      trialDays?: number;
+      fim_prova?: string;
+      estado_subscricao?: SubscriptionStatus;
     },
     options?: { stayInCurrentMode?: boolean }
   ): Promise<boolean> => {

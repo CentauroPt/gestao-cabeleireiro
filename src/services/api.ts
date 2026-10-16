@@ -162,6 +162,10 @@ export class ApiService {
     adminPassword?: string;
     openingTime?: string;
     closingTime?: string;
+    valor_mensal?: number;
+    trialDays?: number;
+    fim_prova?: string;
+    estado_subscricao?: SubscriptionStatus;
   }): Promise<{ salon: Salon; adminUser: User }> {
     // Sincronizar armazenamento antes de validar e gravar
     await syncAndMergeStorage();
@@ -182,8 +186,14 @@ export class ApiService {
 
     const salonId = `salon-${Date.now()}`;
     const nowIso = new Date().toISOString();
-    const trialEndIso = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const trialDays = params.trialDays !== undefined ? Number(params.trialDays) : 30;
+    const trialEndIso =
+      params.fim_prova ||
+      new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toISOString();
     const defaultRate = this.billingConfig.valor_mensal_padrao || 29.0;
+    const monthlyRate =
+      params.valor_mensal !== undefined ? Number(params.valor_mensal) : defaultRate;
+    const subscriptionStatus = params.estado_subscricao || 'prova';
 
     const newSalon: Salon = {
       id: salonId,
@@ -195,15 +205,15 @@ export class ApiService {
       openingTime: params.openingTime || '09:00',
       closingTime: params.closingTime || '20:00',
       slotIntervalMinutes: 10,
-      status: 'ATIVO',
+      status: subscriptionStatus === 'bloqueado' ? 'SUSPENSO' : 'ATIVO',
       createdAt: nowIso,
       primaryColor: '#8B5CF6',
       startDayOfWeek: 1,
       // Faturação e Subscrição SaaS
       data_registo: nowIso,
       fim_prova: trialEndIso,
-      valor_mensal: defaultRate,
-      estado_subscricao: 'prova',
+      valor_mensal: monthlyRate,
+      estado_subscricao: subscriptionStatus,
     };
 
     // Criar Administrador Inicial do novo salão
@@ -979,18 +989,17 @@ export class ApiService {
     // 1. Recarregar do armazenamento para garantir que this.salons está 100% atualizado
     this.reloadFromStorage();
 
-    const oldDefaultRate = this.billingConfig.valor_mensal_padrao || 29.0;
     this.billingConfig = { ...this.billingConfig, ...newConfig };
     localStorage.setItem(STORAGE_KEYS.BILLING_CONFIG, JSON.stringify(this.billingConfig));
     idbSet(STORAGE_KEYS.BILLING_CONFIG, this.billingConfig).catch(() => {});
 
-    // Se o valor mensal padrão foi atualizado, sincroniza também os salões
-    // que estejam a usar a mensalidade padrão ou que não tenham preço específico personalizado
+    // Se o valor mensal padrão foi atualizado, sincroniza APENAS os salões
+    // que não tenham valor_mensal previamente definido (respeita estritamente a individualidade de cada salão)
     if (newConfig.valor_mensal_padrao !== undefined) {
       const newRate = Number(newConfig.valor_mensal_padrao);
       let salonsChanged = false;
       this.salons = this.salons.map((s) => {
-        if (s.valor_mensal === undefined || s.valor_mensal === oldDefaultRate || s.valor_mensal === 29.0) {
+        if (s.valor_mensal === undefined) {
           salonsChanged = true;
           return { ...s, valor_mensal: newRate };
         }
@@ -1164,13 +1173,14 @@ export class ApiService {
       ...(updates.fim_prova ? { fim_prova: updates.fim_prova } : {}),
     };
 
-    if (updates.estado_subscricao === 'ativo') {
+    if (updates.estado_subscricao === 'ativo' || updates.estado_subscricao === 'prova') {
       this.salons[idx].status = 'ATIVO';
     } else if (updates.estado_subscricao === 'bloqueado') {
       this.salons[idx].status = 'SUSPENSO';
     }
 
     saveToStorage(STORAGE_KEYS.SALONS, this.salons);
+    notifyStorageSync();
     supabaseService.syncClient(this.salons[idx]).catch(() => {});
 
     return this.salons[idx];

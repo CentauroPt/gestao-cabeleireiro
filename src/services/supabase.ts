@@ -35,7 +35,7 @@ export class SupabaseService {
         telefone: salon.phone,
         data_registo: salon.data_registo || salon.createdAt || new Date().toISOString(),
         fim_prova: salon.fim_prova || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        valor_mensal: salon.valor_mensal || 29.00,
+        valor_mensal: salon.valor_mensal !== undefined ? Number(salon.valor_mensal) : 29.00,
         estado_subscricao: salon.estado_subscricao || 'prova',
         ultimo_mes_pago: salon.ultimo_mes_pago || null,
         updated_at: new Date().toISOString(),

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SalonStatus, SubscriptionPayment } from '../../types';
+import type { SalonStatus, SubscriptionPayment, SubscriptionStatus } from '../../types';
 import type { SalonSummary } from '../../services/api';
 import { ClientSubscriptionDrawer } from './ClientSubscriptionDrawer';
 import { SubscriptionStatsPanel } from './SubscriptionStatsPanel';
@@ -48,6 +48,7 @@ export const DeveloperPortalView: React.FC = () => {
     notification,
     setNotification,
     validateSubscriptionPayment,
+    billingConfig,
   } = useApp();
 
   const [devTab, setDevTab] = useState<'salons' | 'stats'>('salons');
@@ -55,6 +56,15 @@ export const DeveloperPortalView: React.FC = () => {
   const [isBillingConfigModalOpen, setIsBillingConfigModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | SalonStatus | 'PROVA' | 'BLOQUEADO'>('ALL');
+
+  // Seleção ativa sempre sincronizada com o sumário em tempo real
+  const currentSelectedSummary = useMemo(() => {
+    if (!selectedSalonForSubscription) return null;
+    return (
+      allSalonsSummary.find((s) => s.salon.id === selectedSalonForSubscription.salon.id) ||
+      selectedSalonForSubscription
+    );
+  }, [allSalonsSummary, selectedSalonForSubscription]);
 
   // Modal para suspender com motivo
   const [suspendingSalon, setSuspendingSalon] = useState<SalonSummary | null>(null);
@@ -70,11 +80,22 @@ export const DeveloperPortalView: React.FC = () => {
   const [newSalonAdminEmail, setNewSalonAdminEmail] = useState('');
   const [newSalonAdminPassword, setNewSalonAdminPassword] = useState('');
   const [showNewSalonPassword, setShowNewSalonPassword] = useState(false);
+  const [newSalonRate, setNewSalonRate] = useState<string>(
+    (billingConfig?.valor_mensal_padrao || 29.0).toString()
+  );
+  const [newSalonTrialDays, setNewSalonTrialDays] = useState<string>('30');
+  const [newSalonStatus, setNewSalonStatus] = useState<SubscriptionStatus>('prova');
   const [createdSalonCredentials, setCreatedSalonCredentials] = useState<{
     salonName: string;
     email: string;
     password: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (billingConfig?.valor_mensal_padrao && (!newSalonRate || newSalonRate === '29')) {
+      setNewSalonRate(billingConfig.valor_mensal_padrao.toString());
+    }
+  }, [billingConfig?.valor_mensal_padrao]);
 
   // Modal para alterar palavra-passe do programador (Master)
   const [isDevPasswordModalOpen, setIsDevPasswordModalOpen] = useState(false);
@@ -218,6 +239,11 @@ export const DeveloperPortalView: React.FC = () => {
     }
 
     const chosenPassword = newSalonAdminPassword.trim();
+    const parsedRate = parseFloat(newSalonRate);
+    const validRate = !isNaN(parsedRate) && parsedRate >= 0 ? parsedRate : (billingConfig?.valor_mensal_padrao || 29.0);
+    const parsedDays = parseInt(newSalonTrialDays, 10);
+    const validDays = !isNaN(parsedDays) && parsedDays >= 0 ? parsedDays : 30;
+
     const ok = await registerNewSalon(
       {
         name: newSalonName.trim(),
@@ -227,6 +253,9 @@ export const DeveloperPortalView: React.FC = () => {
         adminName: newSalonAdminName.trim(),
         adminEmail: newSalonAdminEmail.trim().toLowerCase(),
         adminPassword: chosenPassword,
+        valor_mensal: validRate,
+        trialDays: validDays,
+        estado_subscricao: newSalonStatus,
       },
       { stayInCurrentMode: true }
     );
@@ -245,6 +274,9 @@ export const DeveloperPortalView: React.FC = () => {
       setNewSalonAdminName('');
       setNewSalonAdminEmail('');
       setNewSalonAdminPassword('');
+      setNewSalonRate((billingConfig?.valor_mensal_padrao || 29.0).toString());
+      setNewSalonTrialDays('30');
+      setNewSalonStatus('prova');
     }
   };
 
@@ -661,11 +693,11 @@ export const DeveloperPortalView: React.FC = () => {
                                 </span>
                               ) : isTrial ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                                  <Clock className="w-3 h-3 text-indigo-400" /> Prova ({item.daysRemainingInTrial ?? 0}d)
+                                  <Clock className="w-3 h-3 text-indigo-400" /> Prova ({item.daysRemainingInTrial ?? 0}d) • {(s.valor_mensal !== undefined ? Number(s.valor_mensal) : 29).toFixed(0)}€/mês
                                 </span>
                               ) : isAtivo ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                  <CheckCircle2 className="w-3 h-3" /> Ativo • {(s.valor_mensal || 29).toFixed(0)}€/mês
+                                  <CheckCircle2 className="w-3 h-3" /> Ativo • {(s.valor_mensal !== undefined ? Number(s.valor_mensal) : 29).toFixed(0)}€/mês
                                 </span>
                               ) : isSuspenso ? (
                                 <div>
@@ -988,6 +1020,75 @@ export const DeveloperPortalView: React.FC = () => {
                 </span>
               </div>
 
+              {/* Condições Contratuais Iniciais (Subscrição Individual) */}
+              <div className="p-3.5 bg-slate-900/90 border border-purple-500/30 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-purple-400" />
+                    Condições Contratuais Iniciais
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Definido individualmente para este salão
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      Valor Mensal (€)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={newSalonRate}
+                        onChange={(e) => setNewSalonRate(e.target.value)}
+                        className="w-full pl-3 pr-7 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-bold text-white focus:outline-none focus:border-purple-500 font-mono"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">
+                        €
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      Período de Teste
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={newSalonTrialDays}
+                        onChange={(e) => setNewSalonTrialDays(e.target.value)}
+                        className="w-full pl-3 pr-12 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-bold text-white focus:outline-none focus:border-purple-500 font-mono"
+                      />
+                      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px]">
+                        dias
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      Estado Inicial
+                    </label>
+                    <select
+                      value={newSalonStatus}
+                      onChange={(e) => setNewSalonStatus(e.target.value as any)}
+                      className="w-full p-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-semibold text-white focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="prova">Período de Prova</option>
+                      <option value="ativo">Ativo / Regular</option>
+                      <option value="bloqueado">Suspenso / Bloqueado</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center gap-2 pt-3">
                 <button
                   type="button"
@@ -1197,9 +1298,10 @@ export const DeveloperPortalView: React.FC = () => {
       )}
 
       {/* Modal Ficha de Subscrição do Cliente */}
-      {selectedSalonForSubscription && (
+      {currentSelectedSummary && (
         <ClientSubscriptionDrawer
-          salonSummary={selectedSalonForSubscription}
+          key={currentSelectedSummary.salon.id}
+          salonSummary={currentSelectedSummary}
           onClose={() => setSelectedSalonForSubscription(null)}
         />
       )}

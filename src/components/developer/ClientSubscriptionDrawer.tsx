@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SalonSummary } from '../../services/api';
 import type { SubscriptionStatus } from '../../types';
@@ -36,8 +36,21 @@ export const ClientSubscriptionDrawer: React.FC<ClientSubscriptionDrawerProps> =
   const [currentStatus, setCurrentStatus] = useState<SubscriptionStatus>(
     salon.estado_subscricao || 'prova'
   );
+  const [trialDateInput, setTrialDateInput] = useState<string>(
+    salon.fim_prova ? salon.fim_prova.slice(0, 10) : ''
+  );
   const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   const [isValidatingPaymentId, setIsValidatingPaymentId] = useState<string | null>(null);
+
+  // Sincronizar inputs quando o salão selecionado é atualizado ou alterado
+  useEffect(() => {
+    setMonthlyRateInput(
+      (salon.valor_mensal !== undefined ? salon.valor_mensal : billingConfig.valor_mensal_padrao || 29.0).toString()
+    );
+    setCurrentStatus(salon.estado_subscricao || 'prova');
+    setTrialDateInput(salon.fim_prova ? salon.fim_prova.slice(0, 10) : '');
+  }, [salon.id, salon.valor_mensal, salon.estado_subscricao, salon.fim_prova, billingConfig.valor_mensal_padrao]);
 
   // Filtros de histórico
   const [monthFilter, setMonthFilter] = useState('ALL');
@@ -164,6 +177,14 @@ export const ClientSubscriptionDrawer: React.FC<ClientSubscriptionDrawerProps> =
     ? `Período Teste (${salonSummary.daysRemainingInTrial ?? 0}d restantes)`
     : 'Subscrição Regularizada';
 
+  const daysRemainingComputed = useMemo(() => {
+    if (!trialDateInput) return 0;
+    const end = new Date(trialDateInput + 'T23:59:59.999Z').getTime();
+    const now = Date.now();
+    const diff = end - now;
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }, [trialDateInput]);
+
   const handleSaveRateAndStatus = async () => {
     const rate = parseFloat(monthlyRateInput);
     if (isNaN(rate) || rate < 0) {
@@ -172,29 +193,52 @@ export const ClientSubscriptionDrawer: React.FC<ClientSubscriptionDrawerProps> =
     }
 
     setIsSaving(true);
+    setSaveSuccessMessage(null);
     try {
-      await updateSalonSubscription(salon.id, {
+      const updates: {
+        valor_mensal: number;
+        estado_subscricao: SubscriptionStatus;
+        fim_prova?: string;
+      } = {
         valor_mensal: rate,
         estado_subscricao: currentStatus,
-      });
+      };
+
+      if (trialDateInput) {
+        updates.fim_prova = new Date(trialDateInput + 'T23:59:59.999Z').toISOString();
+      }
+
+      await updateSalonSubscription(salon.id, updates);
       await refreshAllSalonsSummary();
+      setSaveSuccessMessage(`Condições contratuais de "${salon.name}" guardadas com sucesso!`);
+      setTimeout(() => setSaveSuccessMessage(null), 4000);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleExtendTrial = async (days: number) => {
-    const baseDate = salon.fim_prova ? new Date(salon.fim_prova) : new Date();
-    const newEnd = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+    const currentEnd = trialDateInput
+      ? new Date(trialDateInput + 'T23:59:59.999Z')
+      : (salon.fim_prova ? new Date(salon.fim_prova) : new Date());
+    const baseDate = currentEnd.getTime() < Date.now() ? new Date() : currentEnd;
+    const newEnd = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
+    const newEndIso = newEnd.toISOString();
+    const newDateStr = newEndIso.slice(0, 10);
+
+    setTrialDateInput(newDateStr);
+    setCurrentStatus('prova');
 
     setIsSaving(true);
+    setSaveSuccessMessage(null);
     try {
       await updateSalonSubscription(salon.id, {
-        fim_prova: newEnd,
+        fim_prova: newEndIso,
         estado_subscricao: 'prova',
       });
-      setCurrentStatus('prova');
       await refreshAllSalonsSummary();
+      setSaveSuccessMessage(`Período de teste prolongado em +${days} dias para "${salon.name}"!`);
+      setTimeout(() => setSaveSuccessMessage(null), 4000);
     } finally {
       setIsSaving(false);
     }
@@ -213,8 +257,6 @@ export const ClientSubscriptionDrawer: React.FC<ClientSubscriptionDrawerProps> =
   const handlePrint = () => {
     window.print();
   };
-
-  const trialDaysRemaining = salonSummary.daysRemainingInTrial ?? 0;
 
   return (
     <>
@@ -253,10 +295,27 @@ export const ClientSubscriptionDrawer: React.FC<ClientSubscriptionDrawerProps> =
         <div className="overflow-y-auto py-5 space-y-6 flex-1 pr-1">
           {/* Card: Edição de Valor Mensal e Estado da Subscrição */}
           <div className="bg-slate-800/90 border border-slate-700 rounded-2xl p-4.5 space-y-4">
-            <h3 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4" />
-              Condições Contratuais da Subscrição
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/80 pb-2.5">
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                  <TrendingUp className="w-4 h-4" />
+                  Condições Contratuais da Subscrição (Específicas deste Salão)
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Estes valores são individuais e aplicam-se exclusivamente a este salão registado.
+                </p>
+              </div>
+              <span className="text-[11px] font-bold text-slate-300 bg-slate-900/90 px-3 py-1 rounded-full border border-purple-500/30 shrink-0">
+                Salão: <strong className="text-white">{salon.name}</strong>
+              </span>
+            </div>
+
+            {saveSuccessMessage && (
+              <div className="p-3 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{saveSuccessMessage}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
               {/* Campo editável Valor Mensal */}
@@ -309,22 +368,25 @@ export const ClientSubscriptionDrawer: React.FC<ClientSubscriptionDrawerProps> =
               </div>
             </div>
 
-            {/* Extensão de Período de Teste */}
-            <div className="pt-3 border-t border-slate-700/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="text-slate-400">
-                <span>Fim do Teste: </span>
-                <strong className="text-white">
-                  {salon.fim_prova ? new Date(salon.fim_prova).toLocaleDateString('pt-PT') : 'N/D'}
-                </strong>
-                {salon.estado_subscricao === 'prova' && (
-                  <span className="text-purple-300 ml-1.5">
-                    ({trialDaysRemaining} dia(s) restantes)
+            {/* Extensão de Período de Teste com Data Específica e Botões Rápidos */}
+            <div className="pt-3 border-t border-slate-700/80 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-2 text-slate-300">
+                <span className="font-bold text-slate-400">Data Fim do Teste:</span>
+                <input
+                  type="date"
+                  value={trialDateInput}
+                  onChange={(e) => setTrialDateInput(e.target.value)}
+                  className="px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs font-bold text-white focus:outline-none focus:border-purple-500 cursor-pointer"
+                />
+                {currentStatus === 'prova' && (
+                  <span className="text-purple-300 font-bold bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded-md">
+                    {daysRemainingComputed} dia(s) restantes
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-slate-400 text-[11px]">Prolongar Teste:</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-slate-400 text-[11px] font-bold mr-1">Prolongar Teste:</span>
                 <button
                   type="button"
                   onClick={() => handleExtendTrial(15)}
@@ -340,6 +402,14 @@ export const ClientSubscriptionDrawer: React.FC<ClientSubscriptionDrawerProps> =
                   className="px-2.5 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 font-bold text-[11px] rounded-lg transition-colors cursor-pointer"
                 >
                   +30 Dias
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExtendTrial(60)}
+                  disabled={isSaving}
+                  className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 font-bold text-[11px] rounded-lg transition-colors cursor-pointer"
+                >
+                  +60 Dias
                 </button>
               </div>
             </div>
