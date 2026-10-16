@@ -606,6 +606,13 @@ export class ApiService {
         salonUsers = [autoAdmin];
       }
     }
+    // Garantir que nenhum colaborador tem password ativa
+    salonUsers.forEach((u) => {
+      if (u.role === 'COLABORADOR' && u.password) {
+        delete (u as any).password;
+      }
+    });
+
     return salonUsers;
   }
 
@@ -614,13 +621,18 @@ export class ApiService {
     if (currentUserRole !== 'ADMIN') {
       throw new Error('Apenas o Administrador pode registar novos colaboradores.');
     }
-    const cleanPassword = userData.password ? userData.password.trim() : undefined;
+    // Colaboradores não têm password
+    const isColab = userData.role === 'COLABORADOR';
+    const cleanPassword = isColab ? undefined : (userData.password ? userData.password.trim() : undefined);
     const newUser: User = {
       id: `user-${Date.now()}`,
       ...userData,
       password: cleanPassword,
       email: userData.email ? userData.email.trim().toLowerCase() : userData.email,
     };
+    if (isColab) {
+      delete (newUser as any).password;
+    }
     this.users.push(newUser);
     saveToStorage(STORAGE_KEYS.USERS, this.users);
     return newUser;
@@ -646,7 +658,10 @@ export class ApiService {
       }
     }
 
-    const updatedPassword = data.password !== undefined ? data.password.trim() : targetUser.password;
+    const isColab = (data.role || targetUser.role) === 'COLABORADOR';
+    const updatedPassword = isColab
+      ? undefined
+      : (data.password !== undefined ? data.password.trim() : targetUser.password);
 
     this.users[index] = {
       ...targetUser,
@@ -654,6 +669,9 @@ export class ApiService {
       password: updatedPassword,
       email: data.email ? data.email.trim().toLowerCase() : targetUser.email,
     };
+    if (isColab) {
+      delete (this.users[index] as any).password;
+    }
     saveToStorage(STORAGE_KEYS.USERS, this.users);
     return this.users[index];
   }
