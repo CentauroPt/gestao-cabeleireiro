@@ -21,6 +21,7 @@ import {
   clearActiveSession,
   onStorageSync,
 } from '../services/storageEngine';
+import { checkIsSupabaseConfigured } from '../services/supabase';
 import {
   calculateEndTime,
   calculateDurationMinutes,
@@ -36,6 +37,14 @@ interface AppContextType {
   setAppMode: (mode: AppMode) => void;
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
+
+  // Base de Dados Central na Nuvem (Supabase / Postgres)
+  isCloudConfigured: boolean;
+  syncCloudNow: () => Promise<boolean>;
+  exportToCloudNow: () => Promise<{ success: boolean; counts?: any; errors?: string[] }>;
+  importFromCloudNow: () => Promise<boolean>;
+  testCloudConnection: () => Promise<{ success: boolean; message: string; counts?: any }>;
+  updateCloudCredentials: (url: string, key: string) => Promise<boolean>;
 
   // Faturação e Subscrições SaaS (Mensalidades)
   billingConfig: BillingConfig;
@@ -1212,6 +1221,78 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return api.getSubscriptionStats();
   };
 
+  // ==========================================
+  // BASE DE DADOS CENTRAL NA NUVEM (SUPABASE)
+  // ==========================================
+  const [isCloudConfigured, setIsCloudConfigured] = useState<boolean>(() => checkIsSupabaseConfigured());
+
+  const syncCloudNow = async (): Promise<boolean> => {
+    try {
+      const changed = await api.syncWithRemote();
+      await refreshData(currentSalonId);
+      await refreshAllSalonsSummary();
+      showNotification('success', 'Sincronização com a nuvem concluída com sucesso!');
+      return changed;
+    } catch (err: any) {
+      showNotification('error', `Erro ao sincronizar com a nuvem: ${err?.message || 'Falha de ligação'}`);
+      return false;
+    }
+  };
+
+  const exportToCloudNow = async () => {
+    try {
+      const res = await api.exportLocalDataToCloud();
+      if (res.success) {
+        showNotification(
+          'success',
+          `Dados enviados para o Supabase! (${res.counts.salons} salões, ${res.counts.users} colaboradores, ${res.counts.services} serviços, ${res.counts.clients} clientes, ${res.counts.appointments} marcações)`
+        );
+      } else {
+        showNotification('error', `Alguns dados não foram sincronizados: ${res.errors.join(', ')}`);
+      }
+      return res;
+    } catch (err: any) {
+      showNotification('error', `Falha ao exportar para o Supabase: ${err?.message || 'Erro desconhecido'}`);
+      return { success: false, counts: { salons: 0, users: 0, services: 0, clients: 0, appointments: 0 }, errors: [err?.message || 'Erro'] };
+    }
+  };
+
+  const importFromCloudNow = async (): Promise<boolean> => {
+    try {
+      const ok = await api.pullAllFromCloudAndReplaceLocal();
+      if (ok) {
+        await refreshData(currentSalonId);
+        await refreshAllSalonsSummary();
+        showNotification('success', 'Todos os dados da nuvem foram importados para este dispositivo!');
+        return true;
+      } else {
+        showNotification('error', 'Não foi possível carregar os dados da nuvem.');
+        return false;
+      }
+    } catch (err: any) {
+      showNotification('error', `Erro ao importar da nuvem: ${err?.message || 'Falha de rede'}`);
+      return false;
+    }
+  };
+
+  const testCloudConnection = async () => {
+    return api.testCloudConnection();
+  };
+
+  const updateCloudCredentials = async (url: string, key: string): Promise<boolean> => {
+    const ok = api.updateCloudCredentials(url, key);
+    setIsCloudConfigured(ok);
+    if (ok) {
+      showNotification('success', 'Credenciais Supabase gravadas e ativadas com sucesso!');
+      await api.syncWithRemote();
+      await refreshData(currentSalonId);
+      await refreshAllSalonsSummary();
+    } else {
+      showNotification('info', 'Credenciais limpas ou incompletas. A trabalhar em modo local.');
+    }
+    return ok;
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1219,6 +1300,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAppMode,
         activeTab,
         setActiveTab,
+        isCloudConfigured,
+        syncCloudNow,
+        exportToCloudNow,
+        importFromCloudNow,
+        testCloudConnection,
+        updateCloudCredentials,
         billingConfig,
         subscriptionPayments,
         isSubscriptionBlocked: subscriptionStatus.isBlocked,

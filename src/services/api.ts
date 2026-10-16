@@ -70,9 +70,17 @@ export class ApiService {
           this.reloadFromStorage();
         }
       });
-      // Escutar sincronizações
+      // Escutar sincronizações locais e entre abas
       onStorageSync(() => {
         this.reloadFromStorage();
+      });
+      // Escutar alterações em tempo real do Supabase (quando outro dispositivo atualiza a base de dados)
+      supabaseService.subscribeToRealtime(() => {
+        this.syncWithRemote().then((changed) => {
+          if (changed) {
+            this.reloadFromStorage();
+          }
+        });
       });
     }
   }
@@ -256,6 +264,7 @@ export class ApiService {
     };
     this.salons.push(newSalon);
     saveToStorage(STORAGE_KEYS.SALONS, this.salons);
+    supabaseService.upsertSalon(newSalon).catch(() => {});
     return newSalon;
   }
 
@@ -265,6 +274,7 @@ export class ApiService {
     if (idx === -1) throw new Error('Salão não encontrado.');
     this.salons[idx] = { ...this.salons[idx], ...updates };
     saveToStorage(STORAGE_KEYS.SALONS, this.salons);
+    supabaseService.upsertSalon(this.salons[idx]).catch(() => {});
     return this.salons[idx];
   }
 
@@ -390,6 +400,9 @@ export class ApiService {
     ]);
 
     // Sincronização em segundo plano com o Supabase
+    supabaseService.upsertSalon(newSalon).catch(() => {});
+    supabaseService.upsertUser(adminUser).catch(() => {});
+    initialServices.forEach((s) => supabaseService.upsertService(s).catch(() => {}));
     supabaseService.syncClient(newSalon).catch(() => {});
 
     return { salon: newSalon, adminUser };
@@ -407,6 +420,7 @@ export class ApiService {
       suspensionReason: reason || (status === 'ATIVO' ? undefined : this.salons[idx].suspensionReason),
     };
     saveToStorage(STORAGE_KEYS.SALONS, this.salons);
+    supabaseService.upsertSalon(this.salons[idx]).catch(() => {});
     return this.salons[idx];
   }
 
@@ -428,6 +442,7 @@ export class ApiService {
       { key: STORAGE_KEYS.APPOINTMENTS, data: this.appointments },
       { key: STORAGE_KEYS.SUBSCRIPTION_PAYMENTS, data: this.subscriptionPayments },
     ], true);
+    supabaseService.deleteSalon(salonId).catch(() => {});
   }
 
   // Gestão da Palavra-passe do Programador
@@ -499,6 +514,7 @@ export class ApiService {
     }
 
     saveToStorage(STORAGE_KEYS.USERS, this.users);
+    supabaseService.upsertUser(targetAdmin).catch(() => {});
     return targetAdmin;
   }
 
@@ -768,6 +784,7 @@ export class ApiService {
     }
     this.users.push(newUser);
     saveToStorage(STORAGE_KEYS.USERS, this.users);
+    supabaseService.upsertUser(newUser).catch(() => {});
     return newUser;
   }
 
@@ -806,6 +823,7 @@ export class ApiService {
       delete (this.users[index] as any).password;
     }
     saveToStorage(STORAGE_KEYS.USERS, this.users);
+    supabaseService.upsertUser(this.users[index]).catch(() => {});
     return this.users[index];
   }
 
@@ -828,6 +846,7 @@ export class ApiService {
 
     this.users = this.users.filter((u) => u.id !== id);
     saveToStorage(STORAGE_KEYS.USERS, this.users, true);
+    supabaseService.deleteUser(id).catch(() => {});
   }
 
   // ================= SERVIÇOS =================
@@ -873,6 +892,7 @@ export class ApiService {
     };
     this.services.push(newService);
     saveToStorage(STORAGE_KEYS.SERVICES, this.services);
+    supabaseService.upsertService(newService).catch(() => {});
     return newService;
   }
 
@@ -882,6 +902,7 @@ export class ApiService {
     if (index === -1) throw new Error('Serviço não encontrado.');
     this.services[index] = { ...this.services[index], ...data };
     saveToStorage(STORAGE_KEYS.SERVICES, this.services);
+    supabaseService.upsertService(this.services[index]).catch(() => {});
     return this.services[index];
   }
 
@@ -892,6 +913,7 @@ export class ApiService {
     }
     this.services = this.services.filter((s) => s.id !== id);
     saveToStorage(STORAGE_KEYS.SERVICES, this.services, true);
+    supabaseService.deleteService(id).catch(() => {});
   }
 
   // ================= CLIENTES =================
@@ -914,6 +936,7 @@ export class ApiService {
     };
     this.clients.push(newClient);
     saveToStorage(STORAGE_KEYS.CLIENTS, this.clients);
+    supabaseService.upsertClient(newClient).catch(() => {});
     return newClient;
   }
 
@@ -929,6 +952,7 @@ export class ApiService {
       email: data.email !== undefined ? (data.email ? data.email.trim().toLowerCase() : undefined) : this.clients[index].email,
     };
     saveToStorage(STORAGE_KEYS.CLIENTS, this.clients);
+    supabaseService.upsertClient(this.clients[index]).catch(() => {});
     return this.clients[index];
   }
 
@@ -939,6 +963,7 @@ export class ApiService {
     }
     this.clients = this.clients.filter((c) => c.id !== id);
     saveToStorage(STORAGE_KEYS.CLIENTS, this.clients, true);
+    supabaseService.deleteClient(id).catch(() => {});
   }
 
   // ================= RESERVAS / AGENDAMENTO =================
@@ -957,6 +982,7 @@ export class ApiService {
     this.appointments.push(newAppointment);
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
     this.reconcileClientVisits();
+    supabaseService.upsertAppointment(newAppointment).catch(() => {});
     return newAppointment;
   }
 
@@ -968,6 +994,7 @@ export class ApiService {
     this.appointments[index] = { ...this.appointments[index], ...data };
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
     this.reconcileClientVisits();
+    supabaseService.upsertAppointment(this.appointments[index]).catch(() => {});
     return this.appointments[index];
   }
 
@@ -984,6 +1011,7 @@ export class ApiService {
     this.appointments = this.appointments.filter((a) => a.id !== id);
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments, true);
     this.reconcileClientVisits();
+    supabaseService.deleteAppointment(id).catch(() => {});
   }
 
   // Concluir serviço e sincronizar automaticamente no histórico do cliente
@@ -995,6 +1023,7 @@ export class ApiService {
     apt.status = 'CONCLUIDA';
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
     this.reconcileClientVisits();
+    supabaseService.upsertAppointment(apt).catch(() => {});
   }
 
   // ==========================================
@@ -1130,58 +1159,150 @@ export class ApiService {
     return { ...this.billingConfig };
   }
 
-  // Sincronizar dados e configurações com o Supabase em segundo plano
+  // Sincronizar dados operacionais e configurações com o Supabase em segundo plano
   async syncWithRemote(): Promise<boolean> {
     try {
       this.reloadFromStorage();
       let changed = false;
-      const remoteConfig = await supabaseService.fetchConfig();
-      if (remoteConfig) {
-        this.billingConfig = { ...this.billingConfig, ...remoteConfig };
-        localStorage.setItem(STORAGE_KEYS.BILLING_CONFIG, JSON.stringify(this.billingConfig));
-        idbSet(STORAGE_KEYS.BILLING_CONFIG, this.billingConfig).catch(() => {});
-        changed = true;
-      }
 
-      const remoteClients = await supabaseService.fetchClients();
-      if (remoteClients && remoteClients.length > 0) {
-        let salonChanged = false;
-        remoteClients.forEach((rc) => {
-          const idx = this.salons.findIndex((s) => s.id === rc.id);
-          if (idx !== -1) {
-            this.salons[idx] = {
-              ...this.salons[idx],
-              ...(rc.valor_mensal !== undefined ? { valor_mensal: rc.valor_mensal } : {}),
-              ...(rc.estado_subscricao ? { estado_subscricao: rc.estado_subscricao } : {}),
-              ...(rc.fim_prova ? { fim_prova: rc.fim_prova } : {}),
-              ...(rc.status ? { status: rc.status } : {}),
-            };
-            salonChanged = true;
-          }
-        });
-        if (salonChanged) {
+      // Descarregar dados completos da nuvem
+      const cloudData = await supabaseService.fetchAllFromCloud();
+      if (cloudData) {
+        // 1. Salões
+        if (cloudData.salons && cloudData.salons.length > 0) {
+          const salonMap = new Map<string, Salon>();
+          this.salons.forEach((s) => salonMap.set(s.id, s));
+          cloudData.salons.forEach((s) => salonMap.set(s.id, s));
+          this.salons = Array.from(salonMap.values());
           saveToStorage(STORAGE_KEYS.SALONS, this.salons);
           changed = true;
         }
-      }
 
-      const remotePayments = await supabaseService.fetchPayments();
-      if (remotePayments && remotePayments.length > 0) {
-        const paymentMap = new Map<string, SubscriptionPayment>();
-        this.subscriptionPayments.forEach((p) => paymentMap.set(p.id, p));
-        remotePayments.forEach((p) => paymentMap.set(p.id, p));
-        this.subscriptionPayments = Array.from(paymentMap.values());
-        saveToStorage(STORAGE_KEYS.SUBSCRIPTION_PAYMENTS, this.subscriptionPayments);
-        changed = true;
+        // 2. Utilizadores
+        if (cloudData.users && cloudData.users.length > 0) {
+          const userMap = new Map<string, User>();
+          this.users.forEach((u) => userMap.set(u.id, u));
+          cloudData.users.forEach((u) => userMap.set(u.id, u));
+          this.users = Array.from(userMap.values());
+          this.ensurePrimaryAdminFlags();
+          saveToStorage(STORAGE_KEYS.USERS, this.users);
+          changed = true;
+        }
+
+        // 3. Serviços
+        if (cloudData.services && cloudData.services.length > 0) {
+          const serviceMap = new Map<string, Service>();
+          this.services.forEach((s) => serviceMap.set(s.id, s));
+          cloudData.services.forEach((s) => serviceMap.set(s.id, s));
+          this.services = Array.from(serviceMap.values());
+          saveToStorage(STORAGE_KEYS.SERVICES, this.services);
+          changed = true;
+        }
+
+        // 4. Clientes
+        if (cloudData.clients && cloudData.clients.length > 0) {
+          const clientMap = new Map<string, Client>();
+          this.clients.forEach((c) => clientMap.set(c.id, c));
+          cloudData.clients.forEach((c) => clientMap.set(c.id, c));
+          this.clients = Array.from(clientMap.values());
+          changed = true;
+        }
+
+        // 5. Agendamentos
+        if (cloudData.appointments && cloudData.appointments.length > 0) {
+          const aptMap = new Map<string, Appointment>();
+          this.appointments.forEach((a) => aptMap.set(a.id, a));
+          cloudData.appointments.forEach((a) => aptMap.set(a.id, a));
+          this.appointments = Array.from(aptMap.values());
+          saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
+          changed = true;
+        }
+
+        // Se houve alterações em clientes ou marcações, reconcilia histórico e total faturado
+        if (changed) {
+          this.reconcileClientVisits();
+          saveToStorage(STORAGE_KEYS.CLIENTS, this.clients);
+        }
+
+        // 6. Configurações Globais
+        if (cloudData.config) {
+          this.billingConfig = { ...this.billingConfig, ...cloudData.config };
+          localStorage.setItem(STORAGE_KEYS.BILLING_CONFIG, JSON.stringify(this.billingConfig));
+          idbSet(STORAGE_KEYS.BILLING_CONFIG, this.billingConfig).catch(() => {});
+          changed = true;
+        }
+
+        // 7. Pagamentos de Subscrição
+        if (cloudData.payments && cloudData.payments.length > 0) {
+          const paymentMap = new Map<string, SubscriptionPayment>();
+          this.subscriptionPayments.forEach((p) => paymentMap.set(p.id, p));
+          cloudData.payments.forEach((p) => paymentMap.set(p.id, p));
+          this.subscriptionPayments = Array.from(paymentMap.values());
+          saveToStorage(STORAGE_KEYS.SUBSCRIPTION_PAYMENTS, this.subscriptionPayments);
+          changed = true;
+        }
       }
 
       if (changed) {
         notifyStorageSync();
       }
       return changed;
-    } catch {
+    } catch (e) {
+      console.warn('Aviso: Sincronização com Supabase em segundo plano falhou (modo offline preservado):', e);
       return false;
     }
+  }
+
+  // Exportar todos os dados locais atuais para a Nuvem Supabase (Semeadura inicial)
+  async exportLocalDataToCloud() {
+    this.reloadFromStorage();
+    return supabaseService.exportAllToCloud({
+      salons: this.salons,
+      users: this.users,
+      services: this.services,
+      clients: this.clients,
+      appointments: this.appointments,
+      billingConfig: this.billingConfig,
+      payments: this.subscriptionPayments,
+    });
+  }
+
+  // Importar forçadamente todos os dados da Nuvem Supabase e substituir cache local
+  async pullAllFromCloudAndReplaceLocal(): Promise<boolean> {
+    const cloudData = await supabaseService.fetchAllFromCloud();
+    if (!cloudData) return false;
+
+    if (cloudData.salons && cloudData.salons.length > 0) this.salons = cloudData.salons;
+    if (cloudData.users && cloudData.users.length > 0) this.users = cloudData.users;
+    if (cloudData.services && cloudData.services.length > 0) this.services = cloudData.services;
+    if (cloudData.clients && cloudData.clients.length > 0) this.clients = cloudData.clients;
+    if (cloudData.appointments && cloudData.appointments.length > 0) this.appointments = cloudData.appointments;
+    if (cloudData.config) this.billingConfig = cloudData.config;
+    if (cloudData.payments && cloudData.payments.length > 0) this.subscriptionPayments = cloudData.payments;
+
+    this.reconcileClientVisits();
+
+    saveMultipleToStorage([
+      { key: STORAGE_KEYS.SALONS, data: this.salons },
+      { key: STORAGE_KEYS.USERS, data: this.users },
+      { key: STORAGE_KEYS.SERVICES, data: this.services },
+      { key: STORAGE_KEYS.CLIENTS, data: this.clients },
+      { key: STORAGE_KEYS.APPOINTMENTS, data: this.appointments },
+      { key: STORAGE_KEYS.SUBSCRIPTION_PAYMENTS, data: this.subscriptionPayments },
+    ], true);
+
+    notifyStorageSync();
+    return true;
+  }
+
+  // Testar ligação ativa à nuvem Supabase
+  async testCloudConnection() {
+    return supabaseService.testConnection();
+  }
+
+  // Atualizar credenciais de Supabase gravadas no navegador
+  updateCloudCredentials(url: string, key: string): boolean {
+    return supabaseService.updateCredentials(url, key);
   }
 
   // Obter Pagamentos de Subscrição (todos ou filtrados por salão)

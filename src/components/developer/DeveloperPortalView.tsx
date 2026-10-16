@@ -6,6 +6,7 @@ import { ClientSubscriptionDrawer } from './ClientSubscriptionDrawer';
 import { SubscriptionStatsPanel } from './SubscriptionStatsPanel';
 import { BillingConfigModal } from './BillingConfigModal';
 import { OwnerPaymentsPanel } from '../subscription/OwnerPaymentsPanel';
+import { CloudDatabasePanel } from './CloudDatabasePanel';
 import {
   Code2,
   Store,
@@ -33,6 +34,7 @@ import {
   BarChart3,
   Clock,
   X,
+  Database,
 } from 'lucide-react';
 
 export const DeveloperPortalView: React.FC = () => {
@@ -53,7 +55,7 @@ export const DeveloperPortalView: React.FC = () => {
     billingConfig,
   } = useApp();
 
-  const [devTab, setDevTab] = useState<'salons' | 'stats' | 'bank_payments'>('salons');
+  const [devTab, setDevTab] = useState<'salons' | 'stats' | 'bank_payments' | 'cloud_database'>('salons');
   const [selectedSalonForSubscription, setSelectedSalonForSubscription] = useState<SalonSummary | null>(null);
   const [isBillingConfigModalOpen, setIsBillingConfigModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -543,6 +545,18 @@ export const DeveloperPortalView: React.FC = () => {
               <CreditCard className="w-4 h-4" />
               <span>Painel de Pagamentos Bancários</span>
             </button>
+
+            <button
+              onClick={() => setDevTab('cloud_database')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                devTab === 'cloud_database'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              <span>Base de Dados na Nuvem (Supabase)</span>
+            </button>
           </div>
 
           <button
@@ -559,6 +573,8 @@ export const DeveloperPortalView: React.FC = () => {
           <SubscriptionStatsPanel />
         ) : devTab === 'bank_payments' ? (
           <OwnerPaymentsPanel />
+        ) : devTab === 'cloud_database' ? (
+          <CloudDatabasePanel />
         ) : (
           <>
             {/* Global KPI Metrics Cards */}
