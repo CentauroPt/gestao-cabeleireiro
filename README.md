@@ -5,12 +5,12 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-8.3-646CFF.svg?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.3-38B2AC.svg?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E.svg?logo=supabase&logoColor=white)](https://supabase.com/)
-[![Stripe](https://img.shields.io/badge/Stripe-Checkout_%26_Webhooks-635BFF.svg?logo=stripe&logoColor=white)](https://stripe.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_%26_Realtime-3ECF8E.svg?logo=supabase&logoColor=white)](https://supabase.com/)
+[![Vercel](https://img.shields.io/badge/Deploy-Vercel_%26_GH--Pages-000000.svg?logo=vercel&logoColor=white)](https://vercel.com/)
 [![Autor](https://img.shields.io/badge/Autor-Jos%C3%A9_Cent%C3%BArio-purple.svg)](#-direitos-de-autor--propriedade-intelectual)
 [![Plataforma](https://img.shields.io/badge/Plataforma-100%25_Web-success.svg)](#-arquitetura-t%C3%A9cnica)
 
-> **SalãoMaster Pro** é uma solução web corporativa de agendamento, fidelização de clientes e gestão empresarial desenvolvida à medida para salões de cabeleireiro, barbearias e espaços de estética. Projetada sob uma arquitetura **Multi-Tenant com isolamento rigoroso de dados**, combina controlo de acessos por funções (**RBAC**), agendamento inteligente anti-sobreposição, gestão técnica de clientes (CRM) e um sistema completo de **checkout bancário online com desbloqueio automático imediato via webhook bancário idempotente**.
+> **SalãoMaster Pro** é uma solução web corporativa de agendamento, fidelização de clientes e gestão empresarial desenvolvida à medida para salões de cabeleireiro, barbearias e espaços de estética. Projetada sob uma arquitetura **Multi-Tenant com isolamento rigoroso de dados**, combina controlo de acessos por funções (**RBAC**), agendamento inteligente com seleção obrigatória de canal de entrada, análise estatística de origens de reserva, gestão técnica de clientes (CRM), base de dados centralizada na nuvem com **Supabase (PostgreSQL + Realtime)** e sincronização multi-dispositivo instantânea.
 
 ---
 
@@ -18,20 +18,22 @@
 
 1. [Visão Geral & Proposta de Valor](#-visão-geral--proposta-de-valor)
 2. [Principais Módulos & Funcionalidades](#-principais-módulos--funcionalidades)
-   - [1. Agenda de Marcações & Calendário em Tempo Real](#1-agenda-de-marcações--calendário-em-tempo-real)
-   - [2. CRM & Fichas Técnicas de Clientes](#2-crm--fichas-técnicas-de-clientes)
-   - [3. Gestão de Equipa & Controlo de Acessos (RBAC)](#3-gestão-de-equipa--controlo-de-acessos-rbac)
-   - [4. Catálogo de Serviços & Tabela de Preços](#4-catálogo-de-serviços--tabela-de-preços)
-   - [5. Subscrição SaaS, Checkout Bancário & Desbloqueio Automático](#5-subscrição-saas-checkout-bancário--desbloqueio-automático)
-   - [6. Consola do Programador (Super Admin / Master)](#6-consola-do-programador-super-admin--master)
+   - [1. Agenda de Marcações & Seleção de Canal de Reserva](#1-agenda-de-marcações--seleção-de-canal-de-reserva)
+   - [2. Módulo de Estatística de Reservas](#2-módulo-de-estatística-de-reservas)
+   - [3. CRM & Fichas Técnicas de Clientes](#3-crm--fichas-técnicas-de-clientes)
+   - [4. Relatórios do Administrador & Faturação Real da Agenda](#4-relatórios-do-administrador--faturação-real-da-agenda)
+   - [5. Gestão de Equipa & Controlo de Acessos (RBAC)](#5-gestão-de-equipa--controlo-de-acessos-rbac)
+   - [6. Catálogo de Serviços & Tabela de Preços](#6-catálogo-de-serviços--tabela-de-preços)
+   - [7. Base de Dados na Nuvem Supabase (PostgreSQL + Realtime)](#7-base-de-dados-na-nuvem-supabase-postgresql--realtime)
+   - [8. Subscrição SaaS & Checkout Bancário Online](#8-subscrição-saas--checkout-bancário-online)
+   - [9. Consola do Programador (Super Admin / Master)](#9-consola-do-programador-super-admin--master)
 3. [Arquitetura Técnica & Stack Tecnológico](#-arquitetura-técnica--stack-tecnológico)
 4. [Modelo de Dados & Esquema da Base de Dados](#-modelo-de-dados--esquema-da-base-de-dados)
-5. [Fluxo do Checkout Bancário & Webhook](#-fluxo-do-checkout-bancário--webhook)
-6. [Instalação & Execução Local](#-instalação--execução-local)
-7. [Variáveis de Ambiente](#-variáveis-de-ambiente)
-8. [Publicação & Deploy](#-publicação--deploy)
-9. [Segurança & Boas Práticas](#-segurança--boas-práticas)
-10. [Direitos de Autor & Propriedade Intelectual](#-direitos-de-autor--propriedade-intelectual)
+5. [Instalação & Execução Local](#-instalação--execução-local)
+6. [Variáveis de Ambiente](#-variáveis-de-ambiente)
+7. [Publicação & Deploy (Vercel & GitHub Pages)](#-publicação--deploy)
+8. [Segurança & Boas Práticas](#-segurança--boas-práticas)
+9. [Direitos de Autor & Propriedade Intelectual](#-direitos-de-autor--propriedade-intelectual)
 
 ---
 
@@ -41,16 +43,21 @@ O **SalãoMaster Pro** resolve os desafios centrais da operação diária de um 
 
 - **100% Web & Responsivo:** Opera nativamente em qualquer navegador moderno (computadores, tablets e telemóveis) sem necessidade de instalação de binários ou executáveis locais.
 - **Multi-Tenant Isolado:** Cada salão registado possui o seu identificador próprio (`salonId`), garantindo confidencialidade e total segregação de clientes, agendamentos, faturação e colaboradores.
-- **Operação Híbrida (Offline-First + Cloud):** Mantém a operação em funcionamento ininterrupto através de persistência local avançada (LocalStorage + IndexedDB), sincronizando automaticamente com a base de dados **Supabase (PostgreSQL)** em nuvem.
-- **Monetização SaaS Integrada:** Ciclo de vida completo do cliente com período de teste (30 dias), bloqueio automático de acesso em caso de mensalidade pendente e reativação instantânea mediante confirmação do banco via webhook.
+- **Operação Híbrida Dual (Offline-First + Nuvem Supabase):** Mantém a operação em funcionamento ininterrupto mesmo sem internet através de persistência local de dupla camada (LocalStorage + IndexedDB), sincronizando em segundo plano com a base de dados **Supabase (PostgreSQL)** em tempo real.
+- **Sincronização Multi-Dispositivo Realtime:** Marcações, clientes e alterações feitas num telemóvel refletem-se instantaneamente no computador da receção e no tablet através do motor **Supabase Realtime**.
+- **Rastreabilidade de Canais de Marcação:** Identificação clara da proveniência de cada agendamento (Presencial, Chamada telefónica ou WhatsApp) com métricas financeiras associadas.
 
 ---
 
 ## 🌟 Principais Módulos & Funcionalidades
 
-### 1. Agenda de Marcações & Calendário em Tempo Real
+### 1. Agenda de Marcações & Seleção de Canal de Reserva
+- **Janela Prévia de Seleção de Canal de Entrada:** Ao clicar em "+ Nova Reserva", ao selecionar qualquer horário vago da grelha diária/semanal ou ao iniciar marcação a partir da ficha do cliente, a primeira janela exibida obrigatoriamente é a escolha do canal de entrada:
+  - 🏢 **Presencial** (cliente que entrou fisicamente no salão)
+  - 📞 **Chamada telefónica** (reserva por voz)
+  - 💬 **WhatsApp** (contacto direto por mensagem)
 - **Vista de Balcão por Colaborador:** Distribuição visual diária em colunas dedicadas aos profissionais operacionais da equipa.
-- **Vista em Lista Cronológica:** Acompanhamento sequencial de todas as marcações do dia com estados visuais claros (Confirmada, Em Curso, Concluída, Cancelada).
+- **Vista em Lista Cronológica:** Acompanhamento sequencial de todas as marcações do dia com estados visuais claros (Agendada, Confirmada, Concluída, Cancelada).
 - **Validação Anti-Sobreposição Estrita:** Cálculo dinâmico do término com base na soma dos tempos dos serviços selecionados. O sistema impede marcações simultâneas para o mesmo profissional.
 - **Proteção Absoluta do Histórico de Reservas:**
   - Colaboradores e administradores podem criar, alterar e cancelar reservas ativas ou futuras.
@@ -58,9 +65,17 @@ O **SalãoMaster Pro** resolve os desafios centrais da operação diária de um 
   - As reservas passadas mantêm disponível o botão de conclusão para registo e fecho do atendimento.
 - **Ocultação do Administrador Principal:** Nas listas de agendamento e seleção de operador, apenas surgem os colaboradores e profissionais técnicos operacionais, preservando a identidade executiva do titular do salão.
 
-### 2. CRM & Fichas Técnicas de Clientes
+### 2. Módulo de Estatística de Reservas
+- Bloco dedicado situado na secção de Administrador, imediatamente ao lado de "Estatísticas & Relatórios Financeiros", com a denominação **"Estatistica de reservas"**.
+- **Canal Líder com Maior Volume:** Indicador de destaque em tempo real que assinala a origem dominante das reservas do salão.
+- **Cartões de KPIs Detalhados:** Volume de reservas, percentagem da operação e total faturado (€) individualmente para **Presencial**, **Chamada telefónica** e **WhatsApp**.
+- **Barra Visual de Distribuição:** Gráfico de barras proporcionais em percentagem demonstrando o peso de cada canal no fluxo do salão.
+- **Filtros Temporais Ágeis:** Segmentação rápida por *Todo o Histórico*, *Hoje*, *Esta Semana*, *Este Mês* e *Últimos 30 dias*.
+- **Tabela Analítica de Reservas:** Listagem detalhada com badge visual identificador do canal de entrada e pesquisa rápida por cliente.
+
+### 3. CRM & Fichas Técnicas de Clientes
 - **Ficha Técnica & Fórmulas:** Registo seguro de fórmulas de coloração, alergias (ex.: sensibilidade a amoníaco ou PPD), preferências de corte e notas confidenciais.
-- **Histórico Completo de Visitas:** Registo consolidado de serviços prestados, datas, montantes pagos e profissional responsável.
+- **Histórico Completo de Visitas:** Registo consolidado de procedimentos realizados, datas, montantes pagos e profissional responsável.
 - **Métricas de Fidelização:** Apresentação automática do volume total faturado (€), número de visitas e ticket médio por atendimento.
 - **Alertas de Retenção & Reativação:**
   - 🟢 **Recente (< 30 dias):** Cliente assíduo e ativo.
@@ -68,36 +83,38 @@ O **SalãoMaster Pro** resolve os desafios centrais da operação diária de um 
   - 🔴 **Alerta / Ausente (+ 60 dias):** Notificação destacada com ligação direta para abertura de conversa no **WhatsApp** com mensagem pré-formatada.
 - **Restrição de Eliminação Exclusiva a Administradores:** Apenas utilizadores com perfil `ADMIN` podem apagar fichas de clientes, prevenindo perdas acidentais ou não autorizadas.
 
-### 3. Gestão de Equipa & Controlo de Acessos (RBAC)
+### 4. Relatórios do Administrador & Faturação Real da Agenda
+- **Sincronização Rigorosa com as Reservas Reais:** Todos os indicadores financeiros (Faturação Filtrada, Procedimentos Realizados, Ticket Médio, Clientes no Período, Vendas por Cliente, Vendas Diárias, Vendas Mensais e Vendas por Colaborador) têm como **fonte única de verdade as reservas reais ativas da agenda** (`appointments`).
+- **Reconciliação Automática no Motor Central:** Ao carregar ou atualizar marcações, o motor de dados (`api.ts`) reconcilia o histórico de visitas e o `totalSpent` das fichas dos clientes, eliminando duplicados e impedindo valores fantasmas.
+- **Exportação Formal A4:** Relatório para impressão ou PDF com cabeçalho corporativo, logótipo do salão, filtros aplicados e discriminação por procedimentos e colaboradores.
+
+### 5. Gestão de Equipa & Controlo de Acessos (RBAC)
 - **Papéis Distintos:**
   - **Administrador:** Acesso total à gestão financeira, relatórios, alteração de serviços, tabela de preços, eliminação de clientes e gestão de administradores.
   - **Colaborador:** Gestão de agenda, criação de clientes, marcação de reservas e conclusão de atendimentos, sem privilégios de eliminação crítica.
 - **Gestão Administrativa & Promoção:** O Administrador Principal pode promover colaboradores a administradores auxiliares com palavra-passe dedicada de segurança, ou revogar tais acessos a qualquer momento.
 - **Relatório de Vendas por Colaborador:** Monitorização de faturação individual, quantidade de atendimentos realizados e métricas de desempenho.
 
-### 4. Catálogo de Serviços & Tabela de Preços
+### 6. Catálogo de Serviços & Tabela de Preços
 - Categorização de serviços (Cabelo, Barba, Coloração, Estética, Tratamentos).
 - Duração configurável por serviço (em blocos de minutos).
 - Definição de preço individual e descrição dos procedimentos.
 
-### 5. Subscrição SaaS, Checkout Bancário & Desbloqueio Automático
-- **Ciclo de Subscrição:** Período de avaliação de 30 dias com contador decrescente.
-- **Ecrã de Acesso Bloqueado ([`BankPaymentBlockedScreen.tsx`](file:///C:/Servidor_Web/src/components/subscription/BankPaymentBlockedScreen.tsx)):**
-  - Apresenta o aviso obrigatório: *"O seu acesso está bloqueado. Efetue o pagamento para continuar"*.
-  - Resumo transparente do montante a pagar (mensalidade do salão) em EUR com indicação de IVA.
-  - Seleção de método: Cartão de Crédito/Débito, Multibanco ou MB WAY.
-  - Botão **"Pagar agora"** que inicia a transação no gateway bancário.
-- **Ecrã de Confirmação ([`PaymentConfirmationScreen.tsx`](file:///C:/Servidor_Web/src/components/subscription/PaymentConfirmationScreen.tsx)):**
-  - Estados em tempo real:
-    - 🟢 *"Pagamento confirmado — acesso desbloqueado"*
-    - 🟡 *"Pagamento pendente"* (à espera da confirmação bancária)
-    - 🔴 *"Pagamento falhado"*
-  - Botão **"Aceder à aplicação"** ativo de imediato logo após a confirmação.
-  - Simulador de webhook bancário em sandbox para testes rápidos ponta a ponta.
-- **Área do Cliente Pós-Pagamento:** Acesso total restabelecido imediatamente, sem banners intrusivos nem restrições de navegação.
-- **Painel de Pagamentos do Dono ([`OwnerPaymentsPanel.tsx`](file:///C:/Servidor_Web/src/components/subscription/OwnerPaymentsPanel.tsx)):** Listagem centralizada com histórico de transações, montante, estado bancário e timestamp de desbloqueio.
+### 7. Base de Dados na Nuvem Supabase (PostgreSQL + Realtime)
+- **Armazenamento Central:** Base de dados PostgreSQL centralizada que alimenta em simultâneo a versão Vercel, dispositivos móveis e computadores de secretária.
+- **Supabase Realtime:** Canais websocket bidirecionais ativos. Uma marcação inserida no telemóvel surge instantaneamente no computador sem recarregar a página.
+- **Painel de Gestão da Nuvem na Consola do Programador:**
+  - Teste de ligação em tempo real com contador de registos na nuvem.
+  - Visualizador do script SQL completo com botão de cópia de 1 clique.
+  - **Botão de Semeadura:** *"Enviar Todos os Dados Locais para a Nuvem Agora (Semear)"* para migrar imediatamente clientes e agendamentos deste computador para a nuvem.
 
-### 6. Consola do Programador (Super Admin / Master)
+### 8. Subscrição SaaS & Checkout Bancário Online
+- **Ciclo de Subscrição:** Período de avaliação de 30 dias com contador decrescente.
+- **Ecrã de Acesso Bloqueado:** Notificação clara de regularização com apresentação do valor da mensalidade do salão em EUR.
+- **Métodos Suportados:** Cartão de Crédito/Débito, Referência Multibanco e MB WAY.
+- **Painel de Pagamentos do Dono:** Listagem centralizada com histórico de transações, montante e timestamp de desbloqueio.
+
+### 9. Consola do Programador (Super Admin / Master)
 - Acesso restrito protegido por palavra-passe mestre.
 - **Barra de Pesquisa Dedicada Superior:** Localização instantânea de salões pelo nome com contador de resultados em tempo real.
 - **Gestão Global de Salões:** Visualização do estado de cada inquilino (Ativo, Prova, Bloqueado, Suspenso), com opção de suspensão justificada, eliminação ou personificação técnica.
@@ -114,13 +131,13 @@ O **SalãoMaster Pro** resolve os desafios centrais da operação diária de um 
 │  React 19 • TypeScript 6 • Tailwind CSS v4 • Lucide Icons • date-fns   │
 ├────────────────────────────────────────────────────────────────────────┤
 │                     CAMADA DE ESTADO & SERVIÇOS                        │
-│  AppContext (Multi-Tenant Context) • bankPaymentService • api.ts       │
-│  Sincronização Reativa: sigec_bank_unlocked • StorageEvent             │
+│  AppContext (Multi-Tenant Context) • ApiService • SupabaseService      │
+│  Sincronização Reativa: Supabase Realtime • StorageEngine • Broadcast  │
 ├───────────────────────────────────┬────────────────────────────────────┤
 │       ARMAZENAMENTO LOCAL         │         NUVEM & BACKEND            │
-│  LocalStorage + IndexedDB Cache   │  Supabase (PostgreSQL 15)          │
-│  (Resiliência Offline-First)      │  Edge Functions (Deno / TS)        │
-│                                   │  Gateway Stripe & Webhooks Bancários│
+│  LocalStorage + IndexedDB Cache   │  Supabase (PostgreSQL 15+)         │
+│  (Resiliência Offline-First)      │  Supabase Realtime WebSockets      │
+│                                   │  Gateway Bancário (Stripe / MBWay) │
 └───────────────────────────────────┴────────────────────────────────────┘
 ```
 
@@ -132,91 +149,95 @@ O **SalãoMaster Pro** resolve os desafios centrais da operação diária de um 
 | **Estilos & Design** | Tailwind CSS v4.3 | Motor utilitário CSS com design system sóbrio e responsivo |
 | **Ícones** | Lucide React | Biblioteca leve de ícones SVG consistentes |
 | **Manipulação de Datas**| date-fns 4.4 | Formatação, comparações e cálculos temporais |
-| **Base de Dados** | PostgreSQL (Supabase) | Armazenamento relacional estruturado com publicação Realtime |
-| **Edge Functions** | Deno / TypeScript | Receção e validação criptográfica (HMAC-SHA256) de webhooks bancários |
-| **Gateway de Pagamento**| Stripe / Gateway Bancário | Checkout online com Cartão, Referência Multibanco e MB WAY |
+| **Base de Dados Central**| Supabase (PostgreSQL 15+) | Armazenamento relacional estruturado com publicação Realtime |
+| **Sincronização em Tempo Real**| Supabase Realtime | Propagação instantânea de marcações e clientes entre dispositivos |
+| **Persistência Offline**| LocalStorage + IndexedDB | Funcionamento 100% contínuo mesmo com quebra de rede |
+| **Hospedagem / Deploy** | Vercel & GitHub Pages | Servidor de alta performance com suporte a SPA rewrites |
 
 ---
 
 ## 📊 Modelo de Dados & Esquema da Base de Dados
 
-O esquema relacional é composto pelas seguintes tabelas principais:
+O esquema relacional é composto por 5 tabelas centrais operacionais e tabelas de gestão SaaS:
 
 ```mermaid
 erDiagram
     SALOES ||--o{ UTILIZADORES : possui
     SALOES ||--o{ SERVICOS : disponibiliza
     SALOES ||--o{ CLIENTES : atende
-    SALOES ||--o{ PAGAMENTOS_SUBSCRICAO : liquida
+    SALOES ||--o{ AGENDAMENTOS : gere
     CLIENTES ||--o{ AGENDAMENTOS : agenda
     UTILIZADORES ||--o{ AGENDAMENTOS : executa
-    CLIENTES_ACESSO ||--o{ PAGAMENTOS_BANCARIOS : gera
-    PAGAMENTOS_BANCARIOS ||--o{ EVENTOS_WEBHOOK : notifica
+    SALOES ||--o{ PAGAMENTOS_SAAS : liquida
 
-    CLIENTES_ACESSO {
-        uuid id PK
-        string nome
-        string email
-        string estado_acesso "bloqueado | ativo"
-        timestamp data_desbloqueio
+    SALOES {
+        text id PK
+        text name
+        text phone
+        text address
+        text nif
+        text opening_time
+        text closing_time
+        integer slot_interval_minutes
+        text status "ATIVO | SUSPENSO | CANCELADO"
+        timestamp created_at
+        text primary_color
+        text estado_subscricao "ativo | bloqueado | prova"
     }
 
-    PAGAMENTOS_BANCARIOS {
-        uuid id PK
-        uuid cliente_id FK
-        decimal valor
-        string moeda "EUR"
-        string estado "pendente | pago | falhado"
-        string referencia_bancaria
-        timestamp data_criacao
-        timestamp data_confirmacao
+    UTILIZADORES {
+        text id PK
+        text salon_id FK
+        text name
+        text email
+        text phone
+        text role "ADMIN | COLABORADOR"
+        boolean is_primary_admin
+        text color
+        jsonb specialties
+        boolean active
     }
 
-    EVENTOS_WEBHOOK {
-        uuid id PK
-        uuid pagamento_id FK
-        jsonb payload
-        timestamp recebido_em
-        boolean processado
+    SERVICOS {
+        text id PK
+        text salon_id FK
+        text name
+        text category "Cabelo | Estética | Barba | Tratamento"
+        integer duration_minutes
+        decimal price
+        text description
     }
-```
 
----
+    CLIENTES {
+        text id PK
+        text salon_id FK
+        text name
+        text phone
+        text email
+        text technical_notes
+        text photo_url
+        decimal total_spent
+        timestamp last_visit_date
+        jsonb visit_history
+    }
 
-## ⚡ Fluxo do Checkout Bancário & Webhook
-
-O processo de pagamento e desbloqueio obedece a um fluxo rigoroso e idempotente:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Cliente as Cliente / Administrador do Salão
-    participant App as SalãoMaster Pro (Frontend)
-    participant Gateway as Gateway Bancário (Stripe)
-    participant Edge as Edge Function (webhook-banco)
-    participant DB as Postgres / Supabase
-    participant Dono as Painel de Pagamentos (Dono)
-
-    Cliente->>App: Acede com mensalidade pendente
-    App->>Cliente: Exibe Ecrã "Acesso Bloqueado"
-    Cliente->>App: Clica em "Pagar agora" (Cartão / Multibanco / MB WAY)
-    App->>Gateway: Cria Sessão de Checkout Bancário
-    Gateway-->>App: Retorna referência / formulário seguro
-    Cliente->>Gateway: Conclui pagamento com sucesso
-    Gateway->>Edge: POST /webhook-banco (com assinatura HMAC-SHA256)
-    Edge->>Edge: Valida assinatura criptográfica
-    Edge->>DB: Verifica idempotência (já foi processado?)
-    alt Pagamento Novo
-        Edge->>DB: UPDATE pagamentos SET estado = 'pago'
-        Edge->>DB: UPDATE clientes SET estado_acesso = 'ativo', data_desbloqueio = NOW()
-        Edge->>DB: INSERT INTO eventos_webhook
-        DB-->>App: Publicação Realtime / Evento sigec_bank_unlocked
-        App->>Cliente: Transita para "Pagamento confirmado — acesso desbloqueado"
-        Cliente->>App: Clica em "Aceder à aplicação" (Acesso Total)
-        Dono->>Dono: Registo visível no Painel de Pagamentos com data de desbloqueio
-    else Pagamento Repetido
-        Edge-->>Gateway: HTTP 200 (Idempotência garantida sem alteração)
-    end
+    AGENDAMENTOS {
+        text id PK
+        text salon_id FK
+        text client_id FK
+        text client_name
+        text client_phone
+        text user_id FK
+        jsonb service_ids
+        jsonb service_names
+        text date "YYYY-MM-DD"
+        text start_time "HH:mm"
+        text end_time "HH:mm"
+        decimal total_price
+        text status "AGENDADA | CONFIRMADA | CONCLUIDA | CANCELADA"
+        text booking_channel "presencial | telefone | whatsapp"
+        text notes
+    }
 ```
 
 ---
@@ -244,7 +265,11 @@ Crie o ficheiro `.env` a partir do modelo de exemplo:
 ```bash
 cp .env.example .env
 ```
-Edite as variáveis conforme as credenciais do seu projeto Supabase e Stripe.
+Insira as credenciais do seu projeto Supabase:
+```ini
+VITE_SUPABASE_URL=https://ixpislhiomtbapjltahl.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_L2qxROhDV4CH6t1mn47B6g_n8d8Kwh0
+```
 
 ### 4. Iniciar o Servidor de Desenvolvimento
 ```bash
@@ -258,65 +283,57 @@ npm run build
 ```
 Os ficheiros minificados e otimizados para produção serão gerados no diretório `dist/`.
 
-### 6. Pré-visualizar o Build de Produção
-```bash
-npm run preview
-```
-
 ---
 
 ## ⚙️ Variáveis de Ambiente
 
-As configurações de ligação à nuvem podem ser especificadas no ficheiro `.env`:
+As configurações de ligação à nuvem podem ser especificadas no ficheiro `.env` ou nas variáveis do painel da **Vercel**:
 
 ```ini
-# Configuração Supabase (Base de dados e Autenticação em Tempo Real)
-VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=sua-chave-publica-anon-aqui
+# Ligação à Base de Dados Central na Nuvem (Supabase PostgreSQL + Realtime)
+VITE_SUPABASE_URL=https://ixpislhiomtbapjltahl.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_L2qxROhDV4CH6t1mn47B6g_n8d8Kwh0
 
 # Endpoint de API REST Backend (Opcional - caso utilize servidor dedicado)
-# Deixe em branco para utilizar o motor local integrado com sincronização Supabase
+# Deixe em branco para utilizar o motor integrado com sincronização Supabase
 VITE_API_BASE_URL=
-
-# Segredo de Assinatura do Webhook Bancário (para validação HMAC na Edge Function)
-STRIPE_WEBHOOK_SECRET=whsec_sua_chave_secreta_webhook
 ```
 
 > [!NOTE]
-> Se as variáveis do Supabase não forem fornecidas, o **SalãoMaster Pro** ativa de forma automática e transparente o seu **motor local de persistência (LocalStorage + IndexedDB)**, permitindo testes completos e demonstração de todas as funcionalidades de forma 100% autónoma.
+> Se as variáveis do Supabase não forem fornecidas, o **SalãoMaster Pro** ativa de forma automática e transparente o seu **motor local de persistência (LocalStorage + IndexedDB)**, permitindo operação completa e autónoma mesmo offline.
 
 ---
 
 ## 🚀 Publicação & Deploy
 
-### GitHub Pages (Produção Oficial)
-O repositório já se encontra configurado para entrega contínua através do ramo `gh-pages`:
+### Vercel (Produção em Nuvem)
+O projeto inclui o ficheiro de configuração [`vercel.json`](file:///C:/Servidor_Web/vercel.json) configurado para construir via `npm run build` com pasta de saída `dist/` e regras de reescrita SPA:
+1. Conecte o repositório GitHub `CentauroPt/gestao-cabeleireiro` na consola da [Vercel](https://vercel.com).
+2. Nas configurações de ambiente (*Environment Variables*), adicione:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+3. A Vercel executa o deploy automático a cada push para o ramo `main`.
+
+### GitHub Pages
+O repositório está configurado para entrega contínua através do ramo `gh-pages` com suporte a SPA através de `404.html`:
 ```bash
 npm run build
 Copy-Item -Force dist\index.html dist\404.html
-New-Item -ItemType File -Force dist\.nojekyll
-$tree = (git --work-tree=dist write-tree)
-$commit = (git commit-tree $tree -m "deploy: update gh-pages")
-git push origin "${commit}:refs/heads/gh-pages" --force
+# Publicar o conteúdo da pasta dist no ramo gh-pages
 ```
-
-### Servidor Próprio / Render / Cloudflare
-Sendo uma aplicação estática (SPA), a pasta `dist/` pode ser servida por qualquer servidor web padrão (Nginx, Apache, Caddy, Cloudflare Pages ou Render Static Site), direcionando todas as rotas para o `index.html`.
 
 ---
 
 ## 🛡️ Segurança & Boas Práticas
 
-1. **Idempotência no Webhook:**
-   Cada evento recebido do banco tem o seu identificador registado na tabela `eventos_webhook`. Tentativas de reenvio de notificações bancárias repetidas são rejeitadas de forma segura com resposta `200 OK`, impedindo duplicações.
-2. **Proteção Criptográfica HMAC-SHA256:**
-   As notificações bancárias enviadas para a Edge Function têm a respetiva assinatura validada com segredo seguro antes de qualquer processamento de dados.
-3. **Sem Armazenamento de Dados Sensíveis:**
-   O sistema não armazena números de cartões bancários, códigos CVV ou credenciais bancárias do utilizador. Toda a transação é processada em ambiente tokenizado de nível 1 PCI-DSS fornecido pelo gateway bancário.
-4. **Proteção RBAC em Camadas:**
-   A validação de permissões ocorre tanto na interface gráfica (ocultação de botões) como nas funções de serviço e no contexto central (`currentUser.role === 'ADMIN'`).
-5. **Proteção Histórica de Dados:**
+1. **Permissões Granulares por Perfil (RBAC):**
+   A validação de permissões ocorre na interface gráfica e na camada de dados (`currentUser.role === 'ADMIN'`). Apenas administradores podem eliminar clientes, editar preços ou aceder à faturação consolidada.
+2. **Proteção Histórica de Dados:**
    Marcações anteriores ao horário corrente encontram-se protegidas por regra lógica universal, impedindo a adulteração de históricos de faturação.
+3. **Persistência em Camadas Resiliente:**
+   Se a rede falhar, os dados são guardados localmente de imediato no LocalStorage e no IndexedDB, sendo enviados para o Supabase assim que a ligação é restabelecida.
+4. **Isolamento Multi-Tenant:**
+   Todas as consultas e gravações são indexadas e filtradas por `salonId`, prevenindo qualquer acesso cruzado entre estabelecimentos.
 
 ---
 
