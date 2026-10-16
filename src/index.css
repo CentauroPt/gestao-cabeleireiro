@@ -99,13 +99,17 @@ body {
     color: #0f172a !important;
     margin: 0 !important;
     padding: 0 !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
   }
 
-  /* Ocultar tudo o que for elemento de interface de ecrã */
+  /* Ocultar tudo o que for elemento de interface de ecrã e navegação */
   header,
   nav,
   aside,
   button,
+  input,
+  select,
   .print\:hidden {
     display: none !important;
   }
@@ -125,8 +129,78 @@ body {
   }
 
   @page {
-    margin: 1.2cm;
+    margin: 0.8cm 1cm;
     size: A4 portrait;
   }
+
+  /* ========================================================
+     EVITAR CORTES DE CARTÕES E BLOCOS A MEIO DA PÁGINA
+     Adaptação perfeita à folha A4 sem fatiar elementos
+     ======================================================== */
+  .break-inside-avoid,
+  .print\:break-inside-avoid,
+  .print-card,
+  article,
+  figure,
+  .rounded-2xl,
+  .rounded-3xl,
+  .rounded-xl,
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  table {
+    break-inside: auto !important;
+    width: 100% !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  /* ========================================================
+     CONTROLO DE MODO DE IMPRESSÃO:
+     - Relatório Formal: body[data-print-mode="report"]
+     - Ecrã Adaptado: body[data-print-mode="screen"]
+     ======================================================== */
+  body[data-print-mode="report"] .screen-only-section {
+    display: none !important;
+  }
+
+  body[data-print-mode="report"] .formal-report-section {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  body[data-print-mode="screen"] .screen-only-section {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  body[data-print-mode="screen"] .formal-report-section {
+    display: none !important;
+  }
+
+  /* Predefinição quando impresso diretamente por Ctrl+P */
+  body:not([data-print-mode]) .formal-report-section {
+    display: none !important;
+  }
+
+  body:not([data-print-mode]) .screen-only-section {
+    display: block !important;
+  }
 }
+
+/* No ecrã normal (fora da impressão), o relatório formal só é visível se estiver em modo preview */
+@media screen {
+  .formal-report-section:not(.preview-mode-active) {
+    display: none !important;
+  }
+}
+
 

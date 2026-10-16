@@ -109,11 +109,18 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
 
   // Estados para Modal de Opções de Impressão (Ecrã vs Relatório de Estatística)
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printMode, setPrintMode] = useState<'screen' | 'report'>('report');
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
 
   const handleExecutePrint = (mode: 'screen' | 'report') => {
-    setPrintMode(mode);
     setIsPrintModalOpen(false);
+    document.body.setAttribute('data-print-mode', mode);
+
+    const cleanup = () => {
+      document.body.removeAttribute('data-print-mode');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+
     setTimeout(() => {
       window.print();
     }, 150);
@@ -519,13 +526,18 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
             <span>Personalizar Salão</span>
           </button>
           {adminSection === 'reports' && (
-            <button
-              onClick={() => setIsPrintModalOpen(true)}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer border border-slate-200"
-              title="Opções de impressão de estatística"
-            >
-              <Printer className="w-4 h-4" /> Imprimir Estatística
-            </button>
+            <div className="relative inline-flex items-center">
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(true)}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-xs hover:shadow transition-all flex items-center gap-2 cursor-pointer"
+                title="Opções de impressão: Relatório de Estatística Formal A4 ou Ecrã"
+              >
+                <Printer className="w-4 h-4 text-white" />
+                <span>Imprimir Estatística</span>
+                <ChevronDown className="w-3.5 h-3.5 opacity-80" />
+              </button>
+            </div>
           )}
           <button
             onClick={lockAdmin}
@@ -578,8 +590,46 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
         <MyPaymentsView />
       ) : (
         <>
-          {/* Contentor Interativo de Ecrã (oculto se o utilizador escolheu Relatório Formal) */}
-          <div className={printMode === 'report' ? 'print:hidden space-y-6' : 'space-y-6'}>
+          {/* Barra Informativa quando em Modo de Pré-visualização do Relatório no Ecrã */}
+          {isPreviewMode && (
+            <div className="bg-slate-900 text-white px-5 py-3.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl print:hidden animate-in fade-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white shrink-0 shadow-md">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                    <span>Pré-visualização do Relatório Formal de Estatística</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/30 text-purple-200 border border-purple-400/30">
+                      Folha A4 Oficial
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    Formato idêntico ao extrato de pagamentos: com logótipo, NIF, dados fiscais, indicadores e discriminação por mês/datas.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleExecutePrint('report')}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" /> Imprimir Relatório Formal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewMode(false)}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer border border-slate-700"
+                >
+                  Voltar ao Ecrã
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Contentor Interativo de Ecrã (oculto se o utilizador está em pré-visualização ou imprimindo relatório formal) */}
+          <div className={`screen-only-section space-y-6 ${isPreviewMode ? 'hidden' : ''}`}>
             {/* Cartão de Personalização do Salão e Início de Semana na Página do Administrador */}
       <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-slate-50 border border-purple-200/80 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
@@ -846,8 +896,8 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
       </div>
 
       {/* KPI Cards (Sempre sincronizados com os valores filtrados) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4 print-card break-inside-avoid">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs print-card break-inside-avoid">
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               {isDateFilterActive ? 'Faturação Filtrada' : 'Faturação Total'}
@@ -864,7 +914,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs print-card break-inside-avoid">
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Procedimentos Realizados</span>
             <span className="p-2 bg-purple-50 text-purple-600 rounded-xl">
@@ -879,7 +929,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs print-card break-inside-avoid">
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Ticket Médio</span>
             <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
@@ -894,7 +944,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs print-card break-inside-avoid">
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               {isDateFilterActive ? 'Clientes no Período' : 'Base de Clientes'}
@@ -1038,9 +1088,9 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
         const topClient = [...enrichedClients].sort((a, b) => b.spent - a.spent)[0];
 
         return (
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-5">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-5 print-card break-inside-avoid">
             {/* Banner de Informação da Faturação — Vendas por Cliente */}
-            <div className="p-4 bg-gradient-to-r from-purple-50 via-indigo-50/60 to-emerald-50/70 border border-purple-200/80 rounded-2xl">
+            <div className="p-4 bg-gradient-to-r from-purple-50 via-indigo-50/60 to-emerald-50/70 border border-purple-200/80 rounded-2xl print-card break-inside-avoid">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
                   <Euro className="w-4 h-4 text-purple-600" />
@@ -1051,14 +1101,14 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="bg-white/90 p-3 rounded-xl border border-purple-100 shadow-2xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 print:grid-cols-4 break-inside-avoid">
+                <div className="bg-white/90 p-3 rounded-xl border border-purple-100 shadow-2xs print-card break-inside-avoid">
                   <div className="text-[11px] font-semibold text-slate-500">Faturação Total (Clientes)</div>
                   <div className="text-xl font-black text-emerald-700 mt-0.5">{totalClientsRevenue.toFixed(2)}€</div>
                   <div className="text-[10px] text-slate-400">{totalClientsVisits} intervenções registadas</div>
                 </div>
 
-                <div className="bg-white/90 p-3 rounded-xl border border-purple-100 shadow-2xs">
+                <div className="bg-white/90 p-3 rounded-xl border border-purple-100 shadow-2xs print-card break-inside-avoid">
                   <div className="text-[11px] font-semibold text-slate-500">Clientes Faturados</div>
                   <div className="text-xl font-black text-slate-900 mt-0.5">
                     {activeClientsCount} <span className="text-xs font-normal text-slate-400">de {enrichedClients.length}</span>
@@ -1066,13 +1116,13 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
                   <div className="text-[10px] text-slate-400">Clientes com histórico de faturação</div>
                 </div>
 
-                <div className="bg-white/90 p-3 rounded-xl border border-purple-100 shadow-2xs">
+                <div className="bg-white/90 p-3 rounded-xl border border-purple-100 shadow-2xs print-card break-inside-avoid">
                   <div className="text-[11px] font-semibold text-slate-500">Média por Cliente</div>
                   <div className="text-xl font-black text-purple-700 mt-0.5">{avgPerClient.toFixed(2)}€</div>
                   <div className="text-[10px] text-slate-400">Valor médio gasto por cliente</div>
                 </div>
 
-                <div className="bg-white/90 p-3 rounded-xl border border-purple-100 shadow-2xs">
+                <div className="bg-white/90 p-3 rounded-xl border border-purple-100 shadow-2xs print-card break-inside-avoid">
                   <div className="text-[11px] font-semibold text-slate-500">Cliente Maior Faturação</div>
                   <div className="text-sm font-black text-slate-900 mt-1 truncate">
                     {topClient && topClient.spent > 0 ? topClient.client.name : 'Sem vendas'}
@@ -1092,7 +1142,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap print:hidden">
                 <div className="relative min-w-[200px]">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
@@ -1126,7 +1176,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
                     <th className="py-3 px-3 text-center">Visitas / Serviços</th>
                     <th className="py-3 px-3 text-right">Ticket Médio</th>
                     <th className="py-3 px-3 text-right">Total Faturado (€)</th>
-                    <th className="py-3 px-3 text-right">Ações</th>
+                    <th className="py-3 px-3 text-right print:hidden">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
@@ -1171,7 +1221,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
                             </div>
                             <span className="text-[10px] text-slate-400">{percentageOfSalon.toFixed(1)}% do salão</span>
                           </td>
-                          <td className="py-3 px-3 text-right">
+                          <td className="py-3 px-3 text-right print:hidden">
                             <button
                               onClick={() => setExpandedClientId(isExpanded ? null : client.id)}
                               className="px-2.5 py-1 text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
@@ -1237,7 +1287,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
                     <td className="py-3.5 px-3 text-right text-sm text-emerald-700">
                       {totalClientsRevenue.toFixed(2)}€
                     </td>
-                    <td className="py-3.5 px-3"></td>
+                    <td className="py-3.5 px-3 print:hidden"></td>
                   </tr>
                 </tfoot>
               </table>
@@ -1896,17 +1946,18 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
           </div>
 
           {/* ========================================================
-              FOLHA FORMAL DE RELATÓRIO DE ESTATÍSTICA (APENAS NA IMPRESSÃO SE printMode === 'report')
+              FOLHA FORMAL DE RELATÓRIO DE ESTATÍSTICA
               Folha A4 formal e discriminada por Mês e por Data, com
               Logótipo do Salão, Dados Fiscais, Indicadores (KPIs),
-              Tabela de Vendas e Validação.
+              Tabela de Vendas e Validação por Carimbo/Assinatura.
+              Aparência profissional idêntica ao histórico de pagamentos.
               ======================================================== */}
           <div
-            className={
-              printMode === 'report'
-                ? 'hidden print:block bg-white text-slate-900 w-full font-sans text-xs'
-                : 'hidden'
-            }
+            className={`formal-report-section ${
+              isPreviewMode
+                ? 'preview-mode-active bg-white p-6 sm:p-8 rounded-3xl border border-slate-300 shadow-xl text-slate-900 w-full font-sans text-xs'
+                : 'bg-white text-slate-900 w-full font-sans text-xs'
+            }`}
           >
             {/* Cabeçalho Formal com Logótipo do Salão e Metadados */}
             <div className="border-b-2 border-slate-900 pb-5 mb-5 flex items-start justify-between gap-6">
@@ -2156,18 +2207,18 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
       {/* Modal de Escolha de Formato de Impressão */}
       {isPrintModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 print:hidden animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
-                  <Printer className="w-5 h-5" />
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-purple-500/20">
+                  <Printer className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-900">
+                  <h3 className="text-lg font-black text-slate-900">
                     Imprimir Estatística
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Selecione o formato de impressão pretendido
+                    Selecione o formato pretendido para a impressão
                   </p>
                 </div>
               </div>
@@ -2180,49 +2231,75 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
               </button>
             </div>
 
-            <div className="mt-5 space-y-3">
-              {/* Opção 1: Relatório de Estatística Formal */}
-              <button
-                type="button"
-                onClick={() => handleExecutePrint('report')}
-                className="w-full text-left p-4 rounded-2xl border-2 border-purple-200 bg-purple-50/40 hover:bg-purple-50 hover:border-purple-400 transition-all cursor-pointer group flex items-start gap-3.5"
-              >
-                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-300">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-sm text-slate-900 group-hover:text-purple-700">
-                      Relatório de Estatística
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200/70 text-purple-800">
-                      Recomendado
-                    </span>
+            <div className="mt-5 space-y-4">
+              {/* Opção 1: Relatório de Estatística Formal (Aparência do Histórico de Pagamentos) */}
+              <div className="p-4.5 rounded-2xl border-2 border-purple-500 bg-purple-50/50 hover:bg-purple-50 transition-all flex flex-col gap-3">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-300">
+                    <FileText className="w-5 h-5" />
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-snug">
-                    Folha formal A4 com logótipo do salão, discriminação detalhada por período e datas, indicadores de desempenho e campo para assinatura/carimbo.
-                  </p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-sm text-slate-900">
+                        Relatório de Estatística Formal (A4)
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-200 text-purple-900">
+                        Recomendado
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1 leading-snug">
+                      Formato oficial idêntico ao extrato do histórico de pagamentos: logótipo do salão, identificação fiscal completa, resumo de indicadores (KPIs), desempenho por colaborador, discriminação detalhada por período e datas, totais e espaço para carimbo/assinatura.
+                    </p>
+                  </div>
                 </div>
-              </button>
 
-              {/* Opção 2: Imprimir Ecrã */}
-              <button
-                type="button"
-                onClick={() => handleExecutePrint('screen')}
-                className="w-full text-left p-4 rounded-2xl border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all cursor-pointer group flex items-start gap-3.5"
-              >
-                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-slate-200">
-                  <Monitor className="w-5 h-5" />
+                <div className="flex items-center gap-2 pt-2 border-t border-purple-200/60 justify-end flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPrintModalOpen(false);
+                      setIsPreviewMode(true);
+                    }}
+                    className="px-3.5 py-1.5 bg-white hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> Pré-visualizar no Ecrã
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExecutePrint('report')}
+                    className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-extrabold shadow-sm hover:shadow transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Imprimir Relatório
+                  </button>
                 </div>
-                <div>
-                  <span className="font-extrabold text-sm text-slate-900 group-hover:text-slate-900">
-                    Imprimir Ecrã
-                  </span>
-                  <p className="text-xs text-slate-500 mt-1 leading-snug">
-                    Imprime numa folha A4 a vista atual do ecrã adaptando o conteúdo da tabela e filtros ao tamanho da página.
-                  </p>
+              </div>
+
+              {/* Opção 2: Imprimir Ecrã (A4 Adaptado) */}
+              <div className="p-4.5 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-all flex flex-col gap-3">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                    <Monitor className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="font-extrabold text-sm text-slate-900">
+                      Imprimir Ecrã Atual (A4 Adaptado)
+                    </span>
+                    <p className="text-xs text-slate-500 mt-1 leading-snug">
+                      Imprime a vista completa do ecrã ajustada à página A4, mantendo os blocos e cartões intactos sem quebras ou cortes a meio.
+                    </p>
+                  </div>
                 </div>
-              </button>
+
+                <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => handleExecutePrint('screen')}
+                    className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Imprimir Ecrã
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 pt-3 border-t border-slate-100 flex justify-end">
