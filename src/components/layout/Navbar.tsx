@@ -3,7 +3,6 @@ import { useApp } from '../../context/AppContext';
 import {
   Scissors,
   Shield,
-  User as UserIcon,
   CheckCircle2,
   AlertTriangle,
   Info,
@@ -17,9 +16,7 @@ import {
 export const Navbar: React.FC = () => {
   const {
     currentSalon,
-    users,
     currentUser,
-    setCurrentUserId,
     notification,
     setNotification,
     isImpersonating,
@@ -43,7 +40,7 @@ export const Navbar: React.FC = () => {
     } else {
       setNotification({
         type: 'info',
-        message: 'O operador atual é Colaborador. Para aceder à Área de Administrador, selecione o Administrador no seletor.',
+        message: 'Acesso reservado ao Administrador do salão.',
       });
     }
   };
@@ -134,63 +131,39 @@ export const Navbar: React.FC = () => {
               </div>
             </div>
 
-            {/* Alternador de Utilizador do Salão (Admin vs Colaborador) */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-1">
-              <div className="flex items-center gap-1.5 px-2 py-1">
-                {currentUser?.role === 'ADMIN' ? (
-                  <Shield className="w-4 h-4 text-purple-600" />
+            {/* Botão Admin */}
+            {currentUser && (
+              <button
+                type="button"
+                onClick={handleAdminClick}
+                className={`text-[11px] font-extrabold px-3 py-1.5 rounded-xl tracking-wide flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs ${
+                  currentUser.role === 'ADMIN'
+                    ? activeTab === 'reports'
+                      ? 'bg-purple-600 text-white border border-purple-700 shadow-purple-200'
+                      : 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-200 hover:border-purple-300'
+                    : 'bg-blue-100 hover:bg-blue-200 text-blue-800 border border-blue-200'
+                }`}
+                title={
+                  currentUser.role === 'ADMIN'
+                    ? 'Clique para aceder à Área de Administrador (Relatórios de Vendas)'
+                    : 'Perfil de Colaborador (Clique para informação)'
+                }
+              >
+                {currentUser.role === 'ADMIN' ? (
+                  <>
+                    <Shield className="w-3.5 h-3.5 text-purple-700" />
+                    <span>ADMIN</span>
+                    {isAdminUnlocked ? (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-0.5" title="Sessão de Administrador Ativa" />
+                    ) : (
+                      <Lock className="w-2.5 h-2.5 text-purple-600 ml-0.5" />
+                    )}
+                  </>
                 ) : (
-                  <UserIcon className="w-4 h-4 text-blue-600" />
+                  <span>{currentUser.role}</span>
                 )}
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-slate-400 font-medium leading-none">Operador:</span>
-                  <select
-                    value={currentUser?.id || ''}
-                    onChange={(e) => setCurrentUserId(e.target.value)}
-                    className="text-xs font-bold text-slate-800 bg-transparent border-none outline-none cursor-pointer p-0"
-                  >
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.role})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {currentUser && (
-                <button
-                  type="button"
-                  onClick={handleAdminClick}
-                  className={`text-[11px] font-extrabold px-2.5 py-1 rounded-md tracking-wide flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-xs ${
-                    currentUser.role === 'ADMIN'
-                      ? activeTab === 'reports'
-                        ? 'bg-purple-600 text-white border border-purple-700 shadow-purple-200'
-                        : 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-200 hover:border-purple-300'
-                      : 'bg-blue-100 hover:bg-blue-200 text-blue-800 border border-blue-200'
-                  }`}
-                  title={
-                    currentUser.role === 'ADMIN'
-                      ? 'Clique para aceder à Área de Administrador (Relatórios de Vendas)'
-                      : 'Perfil de Colaborador (Clique para informação)'
-                  }
-                >
-                  {currentUser.role === 'ADMIN' ? (
-                    <>
-                      <Shield className="w-3.5 h-3.5 text-purple-700" />
-                      <span>ADMIN</span>
-                      {isAdminUnlocked ? (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-0.5" title="Sessão de Administrador Ativa" />
-                      ) : (
-                        <Lock className="w-2.5 h-2.5 text-purple-600 ml-0.5" />
-                      )}
-                    </>
-                  ) : (
-                    <span>{currentUser.role}</span>
-                  )}
-                </button>
-              )}
-            </div>
+              </button>
+            )}
 
             {/* Botão Sair / Terminar Sessão do Salão */}
             <button
