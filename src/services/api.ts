@@ -871,6 +871,7 @@ export class ApiService {
     monthlyRate: number;
     hasPendingPayment: boolean;
   } {
+    this.reloadFromStorage();
     const salon = this.salons.find((s) => s.id === salonId);
     const defaultRate = this.billingConfig.valor_mensal_padrao || 29.0;
     if (!salon) {
@@ -957,9 +958,29 @@ export class ApiService {
 
   // Atualizar Configurações Globais de Faturação (IBAN, MB Way, WhatsApp, Preço Padrão)
   async updateBillingConfig(newConfig: Partial<BillingConfig>): Promise<BillingConfig> {
+    const oldDefaultRate = this.billingConfig.valor_mensal_padrao || 29.0;
     this.billingConfig = { ...this.billingConfig, ...newConfig };
     localStorage.setItem(STORAGE_KEYS.BILLING_CONFIG, JSON.stringify(this.billingConfig));
     idbSet(STORAGE_KEYS.BILLING_CONFIG, this.billingConfig).catch(() => {});
+
+    // Se o valor mensal padrão foi atualizado, sincroniza também os salões
+    // que estejam a usar a mensalidade padrão ou que não tenham preço específico personalizado
+    if (newConfig.valor_mensal_padrao !== undefined) {
+      const newRate = Number(newConfig.valor_mensal_padrao);
+      let salonsChanged = false;
+      this.salons = this.salons.map((s) => {
+        if (s.valor_mensal === undefined || s.valor_mensal === oldDefaultRate || s.valor_mensal === 29.0) {
+          salonsChanged = true;
+          return { ...s, valor_mensal: newRate };
+        }
+        return s;
+      });
+      if (salonsChanged) {
+        saveToStorage(STORAGE_KEYS.SALONS, this.salons);
+        this.salons.forEach((s) => supabaseService.syncClient(s).catch(() => {}));
+      }
+    }
+
     notifyStorageSync();
     await supabaseService.syncBillingConfig(this.billingConfig).catch(() => {});
     return { ...this.billingConfig };

@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { api } from '../../services/api';
 import { SubscriptionLockModal } from './SubscriptionLockModal';
 import {
   CreditCard,
@@ -13,6 +14,7 @@ import {
   AlertCircle,
   PlusCircle,
   Scissors,
+  RefreshCw,
 } from 'lucide-react';
 
 export const MyPaymentsView: React.FC = () => {
@@ -22,12 +24,87 @@ export const MyPaymentsView: React.FC = () => {
     monthlyRate,
     daysRemainingInTrial,
     isSubscriptionBlocked,
+    billingConfig,
+    refreshSubscriptionData,
+    refreshData,
   } = useApp();
 
   const [monthFilter, setMonthFilter] = useState<string>('ALL');
   const [yearFilter, setYearFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Sincronização em tempo real com as atualizações de preços e dados do programador
+  useEffect(() => {
+    refreshSubscriptionData();
+    if (currentSalon?.id) {
+      refreshData(currentSalon.id);
+    }
+    api.syncWithRemote().then((changed) => {
+      if (changed) {
+        refreshSubscriptionData();
+        if (currentSalon?.id) refreshData(currentSalon.id);
+      }
+    }).catch(() => {});
+
+    // Sincronizar ao focar a janela ou aba
+    const handleFocus = () => {
+      refreshSubscriptionData();
+      if (currentSalon?.id) {
+        refreshData(currentSalon.id);
+      }
+      api.syncWithRemote().then((changed) => {
+        if (changed) {
+          refreshSubscriptionData();
+          if (currentSalon?.id) refreshData(currentSalon.id);
+        }
+      }).catch(() => {});
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    // Polling local suave para capturar alterações imediatas de preço feitas pelo programador
+    const intervalId = setInterval(() => {
+      refreshSubscriptionData();
+    }, 2000);
+
+    // Polling remoto via Supabase a cada 6 segundos
+    const remoteIntervalId = setInterval(() => {
+      api.syncWithRemote().then((changed) => {
+        if (changed) {
+          refreshSubscriptionData();
+          if (currentSalon?.id) refreshData(currentSalon.id);
+        }
+      }).catch(() => {});
+    }, 6000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(intervalId);
+      clearInterval(remoteIntervalId);
+    };
+  }, [currentSalon?.id, refreshSubscriptionData, refreshData]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshSubscriptionData();
+      if (currentSalon?.id) {
+        await refreshData(currentSalon.id);
+      }
+      await api.syncWithRemote();
+      await refreshSubscriptionData();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
+
+  // Preço contratado efetivo: Prioridade para valor_mensal específico do salão ou padrão global
+  const effectiveMonthlyRate =
+    currentSalon?.valor_mensal !== undefined
+      ? Number(currentSalon.valor_mensal)
+      : (monthlyRate || billingConfig?.valor_mensal_padrao || 29.0);
 
   // Anos disponíveis nos pagamentos ou ano atual
   const availableYears = useMemo(() => {
@@ -198,6 +275,20 @@ export const MyPaymentsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap print:hidden">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-50 border border-purple-200/60 text-[11px] font-bold text-purple-700">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Preços em tempo real</span>
+          </div>
+
+          <button
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="p-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 rounded-xl border border-slate-200 transition-all cursor-pointer disabled:opacity-50"
+            title="Atualizar dados e preços em tempo real"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+
           <button
             onClick={() => setIsPaymentModalOpen(true)}
             className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-purple-600/20 transition-all flex items-center gap-2 cursor-pointer"
@@ -260,7 +351,7 @@ export const MyPaymentsView: React.FC = () => {
           <span className="text-xs font-bold text-slate-500">Valor Mensal</span>
           <div className="mt-2 flex items-baseline gap-1">
             <span className="text-2xl font-black text-slate-900">
-              {(monthlyRate || 29.0).toFixed(2)}€
+              {effectiveMonthlyRate.toFixed(2)}€
             </span>
             <span className="text-xs font-bold text-slate-400">/ mês</span>
           </div>
@@ -565,7 +656,7 @@ export const MyPaymentsView: React.FC = () => {
         <div className="grid grid-cols-4 gap-3 mb-6 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-500 block">Mensalidade Contratada</span>
-            <span className="text-sm font-black text-slate-900">{monthlyRate.toFixed(2)} € / mês</span>
+            <span className="text-sm font-black text-slate-900">{effectiveMonthlyRate.toFixed(2)} € / mês</span>
           </div>
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Liquidado</span>

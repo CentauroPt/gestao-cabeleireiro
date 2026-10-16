@@ -169,7 +169,7 @@ interface AppContextType {
   deleteService: (id: string) => Promise<boolean>;
 
   // Recarregar dados
-  refreshData: () => Promise<void>;
+  refreshData: (targetSalonId?: string, targetUserId?: string) => Promise<void>;
   resetDemoData: () => void;
 }
 
@@ -201,16 +201,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [subscriptionPayments, setSubscriptionPayments] = useState<SubscriptionPayment[]>([]);
 
   const subscriptionStatus = useMemo(() => {
+    const activeSalon = salons.find((s) => s.id === currentSalonId);
+    const defaultRate = billingConfig.valor_mensal_padrao || 29.0;
     if (!currentSalonId) {
       return {
         isBlocked: false,
         reason: null as 'prova_expirada' | 'mensalidade_pendente' | 'bloqueado_manual' | null,
         daysRemainingInTrial: 30,
-        monthlyRate: billingConfig.valor_mensal_padrao || 29.0,
+        monthlyRate: defaultRate,
         hasPendingPayment: false,
       };
     }
-    return api.checkSalonSubscription(currentSalonId);
+    const check = api.checkSalonSubscription(currentSalonId);
+    const effectiveRate = activeSalon?.valor_mensal !== undefined
+      ? Number(activeSalon.valor_mensal)
+      : (check.monthlyRate || defaultRate);
+    return {
+      ...check,
+      monthlyRate: effectiveRate,
+    };
   }, [currentSalonId, salons, subscriptionPayments, billingConfig]);
 
   const setCurrentSalonId = (id: string) => {
