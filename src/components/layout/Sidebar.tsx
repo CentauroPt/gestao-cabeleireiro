@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Users, Scissors, UserCheck, AlertCircle, BarChart3, CreditCard } from 'lucide-react';
+import { Calendar, Users, Scissors, UserCheck, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export type TabType = 'calendar' | 'clients' | 'staff' | 'services' | 'reports' | 'payments';
@@ -10,7 +10,7 @@ interface Props {
 }
 
 export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
-  const { clients, currentUser, isAdminUnlocked, currentSalon, daysRemainingInTrial, isSubscriptionBlocked } = useApp();
+  const { clients, currentUser, isAdminUnlocked } = useApp();
 
   // Conta quantos clientes estão inativos (+60 dias) para mostrar no badge
   const inactiveCount = clients.filter((c) => {
@@ -20,7 +20,6 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
   }).length;
 
   const isAdmin = currentUser?.role === 'ADMIN';
-  const isTrialActive = currentSalon?.estado_subscricao === 'prova' && !isSubscriptionBlocked;
 
   const menuItems = [
     {
@@ -53,19 +52,12 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
       ? [
           {
             id: 'reports' as TabType,
-            label: 'Estatística',
-            icon: <BarChart3 className="w-5 h-5" />,
+            label: 'Administrador',
+            icon: <ShieldCheck className="w-5 h-5" />,
             badge: !isAdminUnlocked ? 'Admin Lock' : 'Liberado',
             badgeColor: !isAdminUnlocked
               ? 'bg-amber-100 text-amber-800 text-[10px]'
               : 'bg-emerald-100 text-emerald-800 text-[10px]',
-          },
-          {
-            id: 'payments' as TabType,
-            label: 'Os meus pagamentos',
-            icon: <CreditCard className="w-5 h-5" />,
-            badge: isTrialActive ? `${daysRemainingInTrial}d prova` : null,
-            badgeColor: 'bg-purple-100 text-purple-700 text-[10px]',
           },
         ]
       : []),

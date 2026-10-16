@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { VisitHistoryItem } from '../../types';
 import {
-  Lock,
   Unlock,
   ShieldAlert,
   TrendingUp,
@@ -26,8 +25,11 @@ import {
   Eye,
   EyeOff,
   Palette,
+  ShieldCheck,
+  CreditCard,
 } from 'lucide-react';
 import { SalonCustomizationModal } from '../salon/SalonCustomizationModal';
+import { MyPaymentsView } from '../subscription/MyPaymentsView';
 
 type ReportTab = 'clients' | 'daily' | 'monthly' | 'staff';
 
@@ -62,7 +64,11 @@ interface SalesTransaction {
   notes?: string;
 }
 
-export const AdminReportsView: React.FC = () => {
+interface AdminReportsViewProps {
+  initialSection?: 'reports' | 'payments';
+}
+
+export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSection = 'reports' }) => {
   const {
     currentSalon,
     currentUser,
@@ -73,7 +79,19 @@ export const AdminReportsView: React.FC = () => {
     unlockAdmin,
     lockAdmin,
     updateSalonCustomization,
+    daysRemainingInTrial,
+    isSubscriptionBlocked,
+    hasPendingPayment,
   } = useApp();
+
+  const isTrialActive = currentSalon?.estado_subscricao === 'prova' && !isSubscriptionBlocked;
+  const [adminSection, setAdminSection] = useState<'reports' | 'payments'>(initialSection);
+
+  React.useEffect(() => {
+    if (initialSection) {
+      setAdminSection(initialSection);
+    }
+  }, [initialSection]);
 
   // Estados de Autenticação
   const salonAdmins = useMemo(() => {
@@ -318,7 +336,7 @@ export const AdminReportsView: React.FC = () => {
     return (
       <div className="max-w-md mx-auto my-12 p-6 sm:p-8 bg-white rounded-3xl border border-slate-200/80 shadow-xl text-center">
         <div className="w-16 h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
-          <Lock className="w-8 h-8" />
+          <ShieldCheck className="w-8 h-8" />
         </div>
 
         <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-800 text-xs font-bold rounded-full mb-3 border border-amber-200/60">
@@ -326,11 +344,11 @@ export const AdminReportsView: React.FC = () => {
         </span>
 
         <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-          Estatística
+          Administrador
         </h2>
 
         <p className="text-xs sm:text-sm text-slate-500 mt-2 leading-relaxed">
-          Para visualizar a estatística de <strong>{currentSalon?.name}</strong>, introduza as credenciais de um administrador do salão.
+          Para aceder à área de Administrador de <strong>{currentSalon?.name}</strong>, introduza as credenciais de um administrador do salão.
         </p>
 
         <form onSubmit={handleLoginSubmit} autoComplete="off" className="mt-6 text-left space-y-4">
@@ -400,7 +418,7 @@ export const AdminReportsView: React.FC = () => {
             type="submit"
             className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-purple-200 flex items-center justify-center gap-2 cursor-pointer mt-2"
           >
-            <Unlock className="w-4 h-4" /> Desbloquear Acesso a Estatística
+            <Unlock className="w-4 h-4" /> Desbloquear Área do Administrador
           </button>
         </form>
 
@@ -424,11 +442,11 @@ export const AdminReportsView: React.FC = () => {
             <span className="text-xs text-slate-400">• {currentUser?.name || salonAdmins[0]?.name || 'Administrador'}</span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-1 flex items-center gap-2">
-            <BarChart3 className="w-6 h-6 text-purple-600" />
-            Relatórios Financeiros & Vendas
+            <ShieldCheck className="w-6 h-6 text-purple-600" />
+            Área do Administrador
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Estatísticas exclusivas de faturação para o salão <strong>{currentSalon?.name}</strong>.
+            Gestão administrativa, relatórios financeiros e pagamentos do salão <strong>{currentSalon?.name}</strong>.
           </p>
         </div>
 
@@ -441,12 +459,14 @@ export const AdminReportsView: React.FC = () => {
             <Palette className="w-4 h-4 text-purple-600" />
             <span>Personalizar Salão</span>
           </button>
-          <button
-            onClick={() => window.print()}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <Printer className="w-4 h-4" /> Imprimir Relatório
-          </button>
+          {adminSection === 'reports' && (
+            <button
+              onClick={() => window.print()}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Printer className="w-4 h-4" /> Imprimir Relatório
+            </button>
+          )}
           <button
             onClick={lockAdmin}
             className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer border border-rose-200/60"
@@ -457,6 +477,47 @@ export const AdminReportsView: React.FC = () => {
         </div>
       </div>
 
+      {/* Seletor de Módulos da Área do Administrador */}
+      <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center gap-2 border border-slate-200">
+        <button
+          onClick={() => setAdminSection('reports')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+            adminSection === 'reports'
+              ? 'bg-white text-purple-700 shadow-sm border border-slate-200/60'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 shrink-0" />
+          <span>Estatísticas & Relatórios Financeiros</span>
+        </button>
+
+        <button
+          onClick={() => setAdminSection('payments')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+            adminSection === 'payments'
+              ? 'bg-white text-purple-700 shadow-sm border border-slate-200/60'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <CreditCard className="w-4 h-4 shrink-0" />
+          <span>Os Meus Pagamentos</span>
+          {isTrialActive && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-700 border border-purple-200">
+              {daysRemainingInTrial}d prova
+            </span>
+          )}
+          {hasPendingPayment && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+              Pendente
+            </span>
+          )}
+        </button>
+      </div>
+
+      {adminSection === 'payments' ? (
+        <MyPaymentsView />
+      ) : (
+        <>
       {/* Cartão de Personalização do Salão e Início de Semana na Página do Administrador */}
       <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-slate-50 border border-purple-200/80 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
@@ -1770,6 +1831,8 @@ export const AdminReportsView: React.FC = () => {
           </div>
         );
       })()}
+        </>
+      )}
 
       {/* Modal de Personalização de Cores e Logótipo do Salão */}
       {isCustomizationOpen && (
