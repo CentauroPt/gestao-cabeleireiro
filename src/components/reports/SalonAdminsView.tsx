@@ -213,10 +213,10 @@ export const SalonAdminsView: React.FC = () => {
         <div>
           <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
             <UserCheck className="w-5 h-5 text-indigo-600" />
-            Promover Colaboradores a Administrador
+            Gestão de Colaboradores
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Selecione um colaborador da equipa para lhe atribuir privilégios e palavra-passe de administrador.
+            Selecione um colaborador da equipa para lhe atribuir privilégios de administrador ou gerir o seu registo.
           </p>
         </div>
 
