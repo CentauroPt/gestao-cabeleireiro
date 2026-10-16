@@ -98,8 +98,19 @@ function openIndexedDB(): Promise<IDBDatabase | null> {
       return;
     }
 
+    const timer = setTimeout(() => {
+      console.warn('Timeout ao abrir IndexedDB (500ms). A prosseguir com LocalStorage.');
+      resolve(null);
+    }, 500);
+
     try {
       const request = window.indexedDB.open(IDB_NAME, 1);
+
+      request.onblocked = () => {
+        clearTimeout(timer);
+        console.warn('IndexedDB bloqueado por outra ligação.');
+        resolve(null);
+      };
 
       request.onupgradeneeded = (e) => {
         const db = (e.target as IDBOpenDBRequest).result;
@@ -109,14 +120,17 @@ function openIndexedDB(): Promise<IDBDatabase | null> {
       };
 
       request.onsuccess = (e) => {
+        clearTimeout(timer);
         resolve((e.target as IDBOpenDBRequest).result);
       };
 
       request.onerror = () => {
+        clearTimeout(timer);
         console.warn('Não foi possível abrir IndexedDB. Prosseguindo com LocalStorage.');
         resolve(null);
       };
     } catch (err) {
+      clearTimeout(timer);
       console.warn('Erro ao inicializar IndexedDB:', err);
       resolve(null);
     }
@@ -124,43 +138,75 @@ function openIndexedDB(): Promise<IDBDatabase | null> {
 }
 
 export async function idbGet<T>(key: string): Promise<T | null> {
-  const db = await openIndexedDB();
-  if (!db) return null;
+  try {
+    const db = await openIndexedDB();
+    if (!db) return null;
 
-  return new Promise((resolve) => {
-    try {
-      const tx = db.transaction(IDB_STORE, 'readonly');
-      const store = tx.objectStore(IDB_STORE);
-      const req = store.get(key);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(null), 500);
+      try {
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        tx.onabort = () => {
+          clearTimeout(timer);
+          resolve(null);
+        };
+        tx.onerror = () => {
+          clearTimeout(timer);
+          resolve(null);
+        };
+        const store = tx.objectStore(IDB_STORE);
+        const req = store.get(key);
 
-      req.onsuccess = () => {
-        resolve((req.result as T) ?? null);
-      };
+        req.onsuccess = () => {
+          clearTimeout(timer);
+          resolve((req.result as T) ?? null);
+        };
 
-      req.onerror = () => {
+        req.onerror = () => {
+          clearTimeout(timer);
+          resolve(null);
+        };
+      } catch {
+        clearTimeout(timer);
         resolve(null);
-      };
-    } catch {
-      resolve(null);
-    }
-  });
+      }
+    });
+  } catch {
+    return null;
+  }
 }
 
 export async function idbSet<T>(key: string, value: T): Promise<void> {
-  const db = await openIndexedDB();
-  if (!db) return;
+  try {
+    const db = await openIndexedDB();
+    if (!db) return;
 
-  return new Promise((resolve) => {
-    try {
-      const tx = db.transaction(IDB_STORE, 'readwrite');
-      const store = tx.objectStore(IDB_STORE);
-      store.put(value, key);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
-    } catch {
-      resolve();
-    }
-  });
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(), 500);
+      try {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.onabort = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        tx.onerror = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        const store = tx.objectStore(IDB_STORE);
+        store.put(value, key);
+        tx.oncomplete = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      } catch {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+  } catch {
+    return;
+  }
 }
 
 /**
@@ -196,11 +242,67 @@ export function loadFromLocalStorage<T>(key: string, fallback: T[]): T[] {
 
 /**
  * Guarda dados no LocalStorage e no IndexedDB simultaneamente
+ * com proteção estrita contra eliminação acidental de salões, utilizadores e clientes.
  */
-export function saveToStorage<T>(key: string, data: T[]): void {
+export function saveToStorage<T>(key: string, data: T[], allowShrink = false): void {
+  if (!Array.isArray(data)) {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+      idbSet(key, data).catch(() => {});
+      notifyStorageSync();
+    } catch {}
+    return;
+  }
+
+  // PROTEÇÃO MÁXIMA CONTRA PERDA DE DADOS:
+  // Se 'data' estiver vazio mas já existirem dados guardados para salões, utilizadores ou clientes,
+  // recusa terminantemente esvaziar a base de dados para evitar perda acidental por componentes com estado desatualizado.
+  if (data.length === 0 && !allowShrink && (
+    key === STORAGE_KEYS.SALONS ||
+    key === STORAGE_KEYS.USERS ||
+    key === STORAGE_KEYS.CLIENTS
+  )) {
+    try {
+      const existingRaw = localStorage.getItem(key);
+      if (existingRaw) {
+        const existingParsed = JSON.parse(existingRaw);
+        if (Array.isArray(existingParsed) && existingParsed.length > 0) {
+          console.warn(`[BLINDAGEM] Tentativa de sobrescrever ${key} com lista vazia rejeitada para proteger dados existentes.`);
+          return;
+        }
+      }
+    } catch {}
+  }
+
+  // Fusão segura por ID para garantir que nenhum salão, cliente ou utilizador registado seja perdido
+  let finalData: T[] = data;
+  if (!allowShrink && (key === STORAGE_KEYS.SALONS || key === STORAGE_KEYS.USERS || key === STORAGE_KEYS.CLIENTS)) {
+    try {
+      const existingRaw = localStorage.getItem(key);
+      if (existingRaw) {
+        const existingArray = JSON.parse(existingRaw);
+        if (Array.isArray(existingArray) && existingArray.length > 0) {
+          const map = new Map<string, any>();
+          // 1. Manter todos os registos existentes no armazenamento
+          for (const item of existingArray) {
+            if (item && item.id) map.set(item.id, item);
+          }
+          // 2. Aplicar as alterações mais recentes dos itens fornecidos
+          for (const item of data as any[]) {
+            if (item && item.id) {
+              const prev = map.get(item.id);
+              map.set(item.id, prev ? { ...prev, ...item } : item);
+            }
+          }
+          finalData = Array.from(map.values()) as T[];
+        }
+      }
+    } catch {}
+  }
+
   // 1. Tentar gravar no LocalStorage (síncrono)
   try {
-    localStorage.setItem(key, JSON.stringify(data));
+    localStorage.setItem(key, JSON.stringify(finalData));
   } catch (err: any) {
     console.warn(`Aviso: Falha ao gravar ${key} no LocalStorage (${err?.name || err}). A usar IndexedDB de alta capacidade.`, err);
 
@@ -208,7 +310,7 @@ export function saveToStorage<T>(key: string, data: T[]): void {
     if (err?.name === 'QuotaExceededError' || err?.code === 22) {
       tryCleanOldCache();
       try {
-        localStorage.setItem(key, JSON.stringify(data));
+        localStorage.setItem(key, JSON.stringify(finalData));
       } catch {
         // Se ainda falhar, garantimos pelo IndexedDB abaixo
       }
@@ -216,23 +318,17 @@ export function saveToStorage<T>(key: string, data: T[]): void {
   }
 
   // 2. Gravar no IndexedDB de forma resiliente e permanente
-  idbSet(key, data).catch((e) => console.error(`Erro ao sincronizar ${key} com IndexedDB:`, e));
+  idbSet(key, finalData).catch((e) => console.error(`Erro ao sincronizar ${key} com IndexedDB:`, e));
   notifyStorageSync();
 }
 
 /**
  * Grava múltiplos conjuntos de dados no armazenamento de forma atómica
  */
-export function saveMultipleToStorage(entries: Array<{ key: string; data: any[] }>): void {
+export function saveMultipleToStorage(entries: Array<{ key: string; data: any[] }>, allowShrink = false): void {
   for (const entry of entries) {
-    try {
-      localStorage.setItem(entry.key, JSON.stringify(entry.data));
-    } catch (err: any) {
-      console.warn(`Aviso ao gravar ${entry.key}:`, err);
-    }
-    idbSet(entry.key, entry.data).catch((e) => console.error(`Erro ao sincronizar ${entry.key}:`, e));
+    saveToStorage(entry.key, entry.data, allowShrink);
   }
-  notifyStorageSync();
 }
 
 /**

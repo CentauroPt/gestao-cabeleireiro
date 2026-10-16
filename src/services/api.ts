@@ -297,7 +297,7 @@ export class ApiService {
       { key: STORAGE_KEYS.CLIENTS, data: this.clients },
       { key: STORAGE_KEYS.APPOINTMENTS, data: this.appointments },
       { key: STORAGE_KEYS.SUBSCRIPTION_PAYMENTS, data: this.subscriptionPayments },
-    ]);
+    ], true);
   }
 
   // Gestão da Palavra-passe do Programador
@@ -676,7 +676,7 @@ export class ApiService {
     }
 
     this.users = this.users.filter((u) => u.id !== id);
-    saveToStorage(STORAGE_KEYS.USERS, this.users);
+    saveToStorage(STORAGE_KEYS.USERS, this.users, true);
   }
 
   // ================= SERVIÇOS =================
@@ -740,7 +740,7 @@ export class ApiService {
       throw new Error('Apenas o Administrador pode eliminar serviços do catálogo.');
     }
     this.services = this.services.filter((s) => s.id !== id);
-    saveToStorage(STORAGE_KEYS.SERVICES, this.services);
+    saveToStorage(STORAGE_KEYS.SERVICES, this.services, true);
   }
 
   // ================= CLIENTES =================
@@ -787,7 +787,7 @@ export class ApiService {
       throw new Error('Apenas o Administrador pode apagar fichas de clientes.');
     }
     this.clients = this.clients.filter((c) => c.id !== id);
-    saveToStorage(STORAGE_KEYS.CLIENTS, this.clients);
+    saveToStorage(STORAGE_KEYS.CLIENTS, this.clients, true);
   }
 
   // ================= RESERVAS / AGENDAMENTO =================
@@ -828,7 +828,7 @@ export class ApiService {
       throw new Error('Acesso negado: Apenas o Administrador de cada cabeleireiro poderá apagar reservas.');
     }
     this.appointments = this.appointments.filter((a) => a.id !== id);
-    saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
+    saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments, true);
   }
 
   // Concluir serviço e lançar automaticamente no histórico do cliente
@@ -958,6 +958,9 @@ export class ApiService {
 
   // Atualizar Configurações Globais de Faturação (IBAN, MB Way, WhatsApp, Preço Padrão)
   async updateBillingConfig(newConfig: Partial<BillingConfig>): Promise<BillingConfig> {
+    // 1. Recarregar do armazenamento para garantir que this.salons está 100% atualizado
+    this.reloadFromStorage();
+
     const oldDefaultRate = this.billingConfig.valor_mensal_padrao || 29.0;
     this.billingConfig = { ...this.billingConfig, ...newConfig };
     localStorage.setItem(STORAGE_KEYS.BILLING_CONFIG, JSON.stringify(this.billingConfig));
@@ -975,20 +978,22 @@ export class ApiService {
         }
         return s;
       });
-      if (salonsChanged) {
+      if (salonsChanged && this.salons.length > 0) {
         saveToStorage(STORAGE_KEYS.SALONS, this.salons);
         this.salons.forEach((s) => supabaseService.syncClient(s).catch(() => {}));
       }
     }
 
     notifyStorageSync();
-    await supabaseService.syncBillingConfig(this.billingConfig).catch(() => {});
+    // Supabase sync é 100% em segundo plano (fire-and-forget, nunca bloqueia a interface)
+    supabaseService.syncBillingConfig(this.billingConfig).catch(() => {});
     return { ...this.billingConfig };
   }
 
   // Sincronizar dados e configurações com o Supabase em segundo plano
   async syncWithRemote(): Promise<boolean> {
     try {
+      this.reloadFromStorage();
       let changed = false;
       const remoteConfig = await supabaseService.fetchConfig();
       if (remoteConfig) {

@@ -1114,8 +1114,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const updated = await api.updateBillingConfig(newConfig);
       setBillingConfig(updated);
-      await refreshData();
-      await refreshAllSalonsSummary();
+      refreshAllSalonsSummary().catch(() => {});
       showNotification('success', 'Configurações de faturação atualizadas com sucesso.');
       return true;
     } catch (err: any) {
