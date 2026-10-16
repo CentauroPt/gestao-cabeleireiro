@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const SalonAdminsView: React.FC = () => {
-  const { currentSalon, currentUser, users, updateUser, deleteUser } = useApp();
+  const { currentSalon, currentUser, users, isPrimaryAdminUser, updateUser, deleteUser } = useApp();
 
   const [userToPromote, setUserToPromote] = useState<User | null>(null);
   const [promotePassword, setPromotePassword] = useState('');
@@ -54,6 +54,10 @@ export const SalonAdminsView: React.FC = () => {
   };
 
   const handleDemote = async (user: User) => {
+    if (isPrimaryAdminUser(user)) {
+      alert('Não é possível retirar os privilégios de Administrador ao Administrador Principal do salão.');
+      return;
+    }
     if (salonAdmins.length <= 1) {
       alert(
         'O salão deve manter pelo menos um Administrador ativo. Não é possível retirar o cargo ao único Administrador.'
@@ -158,9 +162,15 @@ export const SalonAdminsView: React.FC = () => {
                           )}
                         </h4>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 flex items-center gap-1">
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                              isPrimaryAdminUser(adm)
+                                ? 'bg-purple-100 text-purple-900 border border-purple-200'
+                                : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                            }`}
+                          >
                             <ShieldCheck className="w-3 h-3 text-purple-700" />
-                            ADMINISTRADOR
+                            {isPrimaryAdminUser(adm) ? 'ADMINISTRADOR PRINCIPAL' : 'COLABORADOR (ADMIN)'}
                           </span>
                           <span className="w-2 h-2 rounded-full bg-emerald-500" title="Ativo" />
                         </div>
@@ -185,7 +195,12 @@ export const SalonAdminsView: React.FC = () => {
 
                 {/* Botão de Ação */}
                 <div className="mt-4 pt-3 border-t border-slate-100">
-                  {isCurrentLoggedIn ? (
+                  {isPrimaryAdminUser(adm) ? (
+                    <div className="w-full py-2 px-3 bg-purple-50/60 border border-purple-200/60 text-purple-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 select-none">
+                      <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
+                      <span>Administrador Titular</span>
+                    </div>
+                  ) : isCurrentLoggedIn ? (
                     <div className="w-full py-2 px-3 bg-purple-50/60 border border-purple-200/60 text-purple-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 select-none">
                       <CheckCircle2 className="w-4 h-4 text-purple-600 shrink-0" />
                       <span>Sessão Atual Ativa</span>
@@ -195,7 +210,7 @@ export const SalonAdminsView: React.FC = () => {
                       type="button"
                       onClick={() => handleDemote(adm)}
                       className="w-full py-2 px-3 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-600 hover:text-rose-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer group shadow-2xs hover:shadow-xs active:scale-[0.99]"
-                      title="Retirar estatuto de administrador a este utilizador"
+                      title="Retirar privilégios de administrador a este colaborador"
                     >
                       <ShieldOff className="w-4 h-4 text-slate-400 group-hover:text-rose-600 shrink-0" />
                       <span>Alterar para Colaborador</span>

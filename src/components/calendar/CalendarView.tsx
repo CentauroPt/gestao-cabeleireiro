@@ -109,7 +109,7 @@ function layoutColumnAppointments(
 }
 
 export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInitialClient }) => {
-  const { appointments, users, currentSalon, moveAppointment, nudgeAppointment } = useApp();
+  const { appointments, users, staffMembers, currentSalon, moveAppointment, nudgeAppointment } = useApp();
 
   const todayStr = useMemo(() => {
     const now = new Date();
@@ -653,7 +653,7 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
                 <div className="p-3 text-center text-[11px] font-bold text-slate-400 border-r border-slate-200 uppercase tracking-wider">
                   Horário
                 </div>
-                {users.map((colab) => (
+                {staffMembers.map((colab) => (
                   <div
                     key={colab.id}
                     className="p-3 text-center border-r border-slate-200 last:border-r-0 flex flex-col items-center justify-center"
@@ -688,7 +688,7 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
                 </div>
 
                 {/* Coluna para cada Profissional (Drop Zone) */}
-                {users.map((colab) => {
+                {staffMembers.map((colab) => {
                   const colabApts = dayAppointments.filter((a) => a.userId === colab.id);
                   const positionedApts = layoutColumnAppointments(
                     colabApts,

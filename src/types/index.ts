@@ -40,6 +40,7 @@ export interface User {
   email: string;
   phone: string;
   role: Role;
+  isPrimaryAdmin?: boolean; // Identifica o Administrador Principal do salão (diferente de colaboradores promovidos a admin)
   password?: string;
   color: string; // Hex color for calendar, ex: #3B82F6
   specialties: string[]; // ex: ["Cortes", "Coloração"]

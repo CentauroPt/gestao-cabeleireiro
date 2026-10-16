@@ -109,6 +109,7 @@ export class ApiService {
     });
 
     this.users = loadFromLocalStorage<User>(STORAGE_KEYS.USERS, []);
+    this.ensurePrimaryAdminFlags();
     this.services = loadFromLocalStorage<Service>(STORAGE_KEYS.SERVICES, []);
     this.clients = loadFromLocalStorage<Client>(STORAGE_KEYS.CLIENTS, []);
     this.appointments = loadFromLocalStorage<Appointment>(STORAGE_KEYS.APPOINTMENTS, []);
@@ -116,6 +117,52 @@ export class ApiService {
       STORAGE_KEYS.SUBSCRIPTION_PAYMENTS,
       []
     );
+  }
+ 
+  /**
+   * Garante que cada salão tem exatamente um Administrador Principal marcado (isPrimaryAdmin = true)
+   * e que todos os colaboradores e colaboradores promovidos têm isPrimaryAdmin = false.
+   */
+  private ensurePrimaryAdminFlags(): void {
+    let changed = false;
+    for (const salon of this.salons) {
+      const salonUsers = this.users.filter((u) => u.salonId === salon.id);
+      if (salonUsers.length === 0) continue;
+
+      const hasPrimary = salonUsers.some((u) => u.isPrimaryAdmin === true);
+      if (!hasPrimary) {
+        // Encontrar o administrador principal:
+        // 1º: Nome começa por "Administrador" ou email é admin@...
+        // 2º: Primeiro utilizador com role ADMIN
+        // 3º: Primeiro utilizador da lista
+        let primary = salonUsers.find(
+          (u) =>
+            u.role === 'ADMIN' &&
+            (u.name.toLowerCase().startsWith('administrador') ||
+              u.email.toLowerCase().startsWith('admin@'))
+        );
+        if (!primary) {
+          primary = salonUsers.find((u) => u.role === 'ADMIN');
+        }
+        if (!primary) {
+          primary = salonUsers[0];
+        }
+
+        if (primary) {
+          primary.isPrimaryAdmin = true;
+          primary.role = 'ADMIN';
+          salonUsers.forEach((u) => {
+            if (u.id !== primary!.id && u.isPrimaryAdmin !== false) {
+              u.isPrimaryAdmin = false;
+            }
+          });
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      saveToStorage(STORAGE_KEYS.USERS, this.users);
+    }
   }
 
   getBaseUrl(): string {
@@ -230,6 +277,7 @@ export class ApiService {
       email: cleanEmail,
       phone: params.phone.trim(),
       role: 'ADMIN',
+      isPrimaryAdmin: true,
       password: params.adminPassword?.trim() || undefined,
       color: '#8B5CF6',
       specialties: ['Gestão', 'Cortes & Estilo'],
@@ -361,6 +409,7 @@ export class ApiService {
         email: `admin@${cleanSlug || 'salao'}.pt`,
         phone: salon.phone || '',
         role: 'ADMIN',
+        isPrimaryAdmin: true,
         password: cleanPw,
         color: salon.primaryColor || '#8B5CF6',
         specialties: ['Gestão', 'Administração'],
@@ -612,6 +661,7 @@ export class ApiService {
           email: `admin@${cleanSlug || 'salao'}.pt`,
           phone: salon.phone || '',
           role: 'ADMIN',
+          isPrimaryAdmin: true,
           password: '',
           color: salon.primaryColor || '#8B5CF6',
           specialties: ['Gestão', 'Administração'],
@@ -643,6 +693,7 @@ export class ApiService {
     const newUser: User = {
       id: `user-${Date.now()}`,
       ...userData,
+      isPrimaryAdmin: false,
       password: cleanPassword,
       email: userData.email ? userData.email.trim().toLowerCase() : userData.email,
     };

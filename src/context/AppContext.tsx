@@ -81,6 +81,8 @@ interface AppContextType {
   currentSalon: Salon | null;
   setCurrentSalonId: (id: string) => void;
   users: User[];
+  staffMembers: User[]; // Colaboradores e Colaboradores com autorização de administrador (exclui o Administrador Principal)
+  isPrimaryAdminUser: (user: User) => boolean;
   currentUser: User | null;
   setCurrentUserId: (id: string) => void;
   services: Service[];
@@ -374,6 +376,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return null;
   }, [users, currentUserId]);
+
+  const isPrimaryAdminUser = useCallback(
+    (u: User): boolean => {
+      if (u.isPrimaryAdmin === true) return true;
+      if (u.isPrimaryAdmin === false) return false;
+      // Fallback defensivo: se o cargo for ADMIN e o nome começar por "Administrador" ou email admin@
+      if (u.role === 'ADMIN') {
+        if (
+          u.name.toLowerCase().startsWith('administrador') ||
+          u.email.toLowerCase().startsWith('admin@')
+        ) {
+          return true;
+        }
+        const salonAdmins = users.filter((x) => x.salonId === u.salonId && x.role === 'ADMIN');
+        if (salonAdmins.length > 0 && salonAdmins[0].id === u.id) {
+          return true;
+        }
+      }
+      return false;
+    },
+    [users]
+  );
+
+  // Colaboradores e Colaboradores com autorização de administrador (exclui o Administrador Principal)
+  const staffMembers = useMemo(() => {
+    return users.filter(
+      (u) =>
+        u.salonId === currentSalonId &&
+        !isPrimaryAdminUser(u) &&
+        u.active !== false
+    );
+  }, [users, currentSalonId, isPrimaryAdminUser]);
 
   useEffect(() => {
     if (currentUser && currentUserId !== currentUser.id) {
@@ -1208,6 +1242,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentSalon,
         setCurrentSalonId,
         users,
+        staffMembers,
+        isPrimaryAdminUser,
         currentUser,
         setCurrentUserId,
         services,

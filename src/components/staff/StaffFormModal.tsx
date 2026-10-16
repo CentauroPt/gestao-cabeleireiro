@@ -57,7 +57,7 @@ export const StaffFormModal: React.FC<Props> = ({ initialUser, onClose, onSucces
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
-        role: 'COLABORADOR',
+        role: initialUser.role || 'COLABORADOR',
         color,
         specialties,
       });

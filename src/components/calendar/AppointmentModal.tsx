@@ -47,6 +47,7 @@ export const AppointmentModal: React.FC<Props> = ({
   const {
     clients,
     users,
+    staffMembers,
     services,
     appointments,
     currentUser,
@@ -91,6 +92,15 @@ export const AppointmentModal: React.FC<Props> = ({
       setClientId(initialClient.id);
     }
   }, [initialClient, initialAppointment]);
+
+  useEffect(() => {
+    if (!isEditing && userId && staffMembers.length > 0) {
+      const isProf = staffMembers.some((s) => s.id === userId);
+      if (!isProf) {
+        setUserId(staffMembers[0].id);
+      }
+    }
+  }, [staffMembers, isEditing, userId]);
 
   // Estados para pesquisa de cliente e abertura da janela de registo de novo cliente (ClientFormModal)
   const [clientSearchQuery, setClientSearchQuery] = useState<string>('');
@@ -576,7 +586,7 @@ export const AppointmentModal: React.FC<Props> = ({
               className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none bg-white cursor-pointer disabled:bg-slate-100 disabled:cursor-not-allowed"
             >
               <option value="">Selecione o profissional...</option>
-              {users.map((u) => (
+              {staffMembers.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name} ({u.role}) — {u.specialties.join(', ') || 'Geral'}
                 </option>

@@ -12,17 +12,15 @@ import {
 } from 'lucide-react';
 
 export const StaffList: React.FC = () => {
-  const { users, currentUser, currentSalon } = useApp();
+  const { staffMembers, currentUser, currentSalon } = useApp();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<User | null>(null);
 
   const isAdmin = currentUser?.role === 'ADMIN';
 
-  // Apenas colaboradores são exibidos nesta página (o administrador não aparece nesta lista)
-  const collaborators = users.filter(
-    (u) => u.salonId === currentSalon?.id && u.role !== 'ADMIN'
-  );
+  // Colaboradores e Colaboradores com autorização de administrador (o Administrador Principal não aparece nesta lista)
+  const collaborators = staffMembers;
 
   return (
     <div className="space-y-6">
@@ -117,8 +115,14 @@ export const StaffList: React.FC = () => {
                           {colab.name}
                         </h3>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800">
-                            COLABORADOR
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                              colab.role === 'ADMIN'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}
+                          >
+                            {colab.role === 'ADMIN' ? 'COLABORADOR (ADMIN)' : 'COLABORADOR'}
                           </span>
                           <span className="w-2 h-2 rounded-full bg-emerald-500" title="Ativo" />
                         </div>

@@ -24,7 +24,7 @@ interface Props {
 }
 
 export const ClientList: React.FC<Props> = ({ onDirectBook }) => {
-  const { clients, users, currentUser, currentSalon, deleteClient } = useApp();
+  const { clients, users, staffMembers, currentUser, currentSalon, deleteClient } = useApp();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [inactivityFilter, setInactivityFilter] = useState<'ALL' | 'RECENTE' | 'ATENCAO' | 'INATIVO'>('ALL');
@@ -181,7 +181,7 @@ export const ClientList: React.FC<Props> = ({ onDirectBook }) => {
             className="text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg outline-none bg-white font-medium cursor-pointer"
           >
             <option value="ALL">Todos os profissionais</option>
-            {users.map((u) => (
+            {staffMembers.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.name}
               </option>

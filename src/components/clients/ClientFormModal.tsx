@@ -22,7 +22,7 @@ interface Props {
 }
 
 export const ClientFormModal: React.FC<Props> = ({ initialClient, onClose, onSuccess }) => {
-  const { users, addClient, updateClient } = useApp();
+  const { staffMembers, addClient, updateClient } = useApp();
 
   const [name, setName] = useState(initialClient?.name || '');
   const [phone, setPhone] = useState(initialClient?.phone || '');
@@ -254,7 +254,7 @@ export const ClientFormModal: React.FC<Props> = ({ initialClient, onClose, onSuc
               className="w-full text-sm px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none bg-white cursor-pointer"
             >
               <option value="">Sem profissional fixo (Atendimento geral)</option>
-              {users.map((u) => (
+              {staffMembers.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name} — {u.specialties.join(', ') || u.role}
                 </option>

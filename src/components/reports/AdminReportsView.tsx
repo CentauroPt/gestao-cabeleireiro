@@ -77,6 +77,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
     currentSalon,
     currentUser,
     users,
+    staffMembers,
     clients,
     appointments,
     isAdminUnlocked,
@@ -1759,7 +1760,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
       {/* 4. RELATÓRIO DE VENDAS POR COLABORADOR */}
       {/* ======================================================== */}
       {activeReportTab === 'staff' && (() => {
-        const staffList = users.map((user) => {
+        const staffList = staffMembers.map((user) => {
           const userSales = filteredSales.filter((s) => s.professionalId === user.id);
           const userTotal = userSales.reduce((sum, s) => sum + s.amount, 0);
           const count = userSales.length;
