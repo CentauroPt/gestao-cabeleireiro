@@ -15,6 +15,7 @@ import {
   PlusCircle,
   Scissors,
   RefreshCw,
+  X,
 } from 'lucide-react';
 
 export const MyPaymentsView: React.FC = () => {
@@ -34,6 +35,17 @@ export const MyPaymentsView: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showPaymentSuccessBanner, setShowPaymentSuccessBanner] = useState(false);
+
+  // Auto-fecho do aviso de sucesso após 10 segundos
+  useEffect(() => {
+    if (showPaymentSuccessBanner) {
+      const timer = setTimeout(() => {
+        setShowPaymentSuccessBanner(false);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [showPaymentSuccessBanner]);
 
   // Sincronização em tempo real limpa com dados de subscrição (sem loops)
   useEffect(() => {
@@ -212,6 +224,10 @@ export const MyPaymentsView: React.FC = () => {
         <SubscriptionLockModal
           forceOpen={true}
           onClose={() => setIsPaymentModalOpen(false)}
+          onPaymentSuccess={() => {
+            setShowPaymentSuccessBanner(true);
+            setIsPaymentModalOpen(false);
+          }}
         />
       )}
 
@@ -348,13 +364,23 @@ export const MyPaymentsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Mensagem de Sucesso Permanente quando ativo */}
-      {!isSubscriptionBlocked && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 text-emerald-900 print:hidden">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <p className="text-xs sm:text-sm font-bold">
-            Pagamento bem-sucedido. Pode continuar a utilizar o programa.
-          </p>
+      {/* Mensagem exibida apenas após efetuar o pagamento com sucesso */}
+      {showPaymentSuccessBanner && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between gap-3 text-emerald-900 print:hidden animate-in fade-in duration-300 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <p className="text-xs sm:text-sm font-bold">
+              Pagamento bem-sucedido. Pode continuar a utilizar o programa.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowPaymentSuccessBanner(false)}
+            className="text-emerald-700 hover:text-emerald-900 p-1 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer"
+            title="Fechar aviso"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 

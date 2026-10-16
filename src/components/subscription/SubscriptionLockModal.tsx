@@ -19,11 +19,13 @@ import {
 interface SubscriptionLockModalProps {
   forceOpen?: boolean;
   onClose?: () => void;
+  onPaymentSuccess?: () => void;
 }
 
 export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
   forceOpen = false,
   onClose,
+  onPaymentSuccess,
 }) => {
   const {
     isSubscriptionBlocked,
@@ -55,12 +57,13 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
       setUnblockedSuccess(true);
       const timer = setTimeout(() => {
         setUnblockedSuccess(false);
+        if (onPaymentSuccess) onPaymentSuccess();
         if (onClose) onClose();
       }, 2500);
       return () => clearTimeout(timer);
     }
     prevBlockedRef.current = isSubscriptionBlocked;
-  }, [isSubscriptionBlocked, onClose]);
+  }, [isSubscriptionBlocked, onClose, onPaymentSuccess]);
 
   // Sincronização em tempo real com as alterações do programador (IBAN, MB Way, Mensalidade, Validação)
   useEffect(() => {
@@ -157,6 +160,11 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
 
       if (ok) {
         setJustSubmitted(true);
+        if (onPaymentSuccess) {
+          setTimeout(() => {
+            onPaymentSuccess();
+          }, 1200);
+        }
       }
     } finally {
       setIsSubmitting(false);
