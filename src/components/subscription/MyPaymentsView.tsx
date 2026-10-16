@@ -35,56 +35,20 @@ export const MyPaymentsView: React.FC = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Sincronização em tempo real com as atualizações de preços e dados do programador
+  // Sincronização em tempo real limpa com dados de subscrição (sem loops)
   useEffect(() => {
     refreshSubscriptionData();
-    if (currentSalon?.id) {
-      refreshData(currentSalon.id);
-    }
-    api.syncWithRemote().then((changed) => {
-      if (changed) {
-        refreshSubscriptionData();
-        if (currentSalon?.id) refreshData(currentSalon.id);
-      }
-    }).catch(() => {});
 
-    // Sincronizar ao focar a janela ou aba
+    // Sincronizar quando a janela ganha foco
     const handleFocus = () => {
       refreshSubscriptionData();
-      if (currentSalon?.id) {
-        refreshData(currentSalon.id);
-      }
-      api.syncWithRemote().then((changed) => {
-        if (changed) {
-          refreshSubscriptionData();
-          if (currentSalon?.id) refreshData(currentSalon.id);
-        }
-      }).catch(() => {});
     };
 
     window.addEventListener('focus', handleFocus);
-
-    // Polling local suave para capturar alterações imediatas de preço feitas pelo programador
-    const intervalId = setInterval(() => {
-      refreshSubscriptionData();
-    }, 2000);
-
-    // Polling remoto via Supabase a cada 6 segundos
-    const remoteIntervalId = setInterval(() => {
-      api.syncWithRemote().then((changed) => {
-        if (changed) {
-          refreshSubscriptionData();
-          if (currentSalon?.id) refreshData(currentSalon.id);
-        }
-      }).catch(() => {});
-    }, 6000);
-
     return () => {
       window.removeEventListener('focus', handleFocus);
-      clearInterval(intervalId);
-      clearInterval(remoteIntervalId);
     };
-  }, [currentSalon?.id, refreshSubscriptionData, refreshData]);
+  }, [refreshSubscriptionData]);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import type {
   Salon,
   SalonStatus,
@@ -243,38 +243,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4500);
   };
 
-  const refreshAllSalonsSummary = async () => {
+  // Comparador de igualdade profunda para evitar re-renderizações desnecessárias
+  const areObjectsEqual = <T,>(a: T, b: T): boolean => {
+    if (a === b) return true;
+    if (!a || !b) return false;
     try {
-      const summaries = await api.getAllSalonsSummary();
-      setAllSalonsSummary(summaries);
-    } catch (e) {
-      console.error('Erro ao ler resumo dos salões:', e);
+      return JSON.stringify(a) === JSON.stringify(b);
+    } catch {
+      return false;
     }
   };
 
-  const refreshSubscriptionData = async () => {
+  const refreshAllSalonsSummary = useCallback(async () => {
+    try {
+      const summaries = await api.getAllSalonsSummary();
+      setAllSalonsSummary((prev) => (areObjectsEqual(prev, summaries) ? prev : summaries));
+    } catch (e) {
+      console.error('Erro ao ler resumo dos salões:', e);
+    }
+  }, []);
+
+  const refreshSubscriptionData = useCallback(async () => {
     try {
       const config = api.getBillingConfig();
-      setBillingConfig(config);
+      setBillingConfig((prev) => (areObjectsEqual(prev, config) ? prev : config));
       const allSalons = await api.getSalons();
-      setSalons(allSalons);
+      setSalons((prev) => (areObjectsEqual(prev, allSalons) ? prev : allSalons));
       if (currentSalonId) {
         const payments = await api.getSubscriptionPayments(currentSalonId);
-        setSubscriptionPayments(payments);
+        setSubscriptionPayments((prev) => (areObjectsEqual(prev, payments) ? prev : payments));
       } else {
         const allPayments = await api.getSubscriptionPayments();
-        setSubscriptionPayments(allPayments);
+        setSubscriptionPayments((prev) => (areObjectsEqual(prev, allPayments) ? prev : allPayments));
       }
     } catch (e) {
       console.error('Erro ao atualizar dados de subscrição:', e);
     }
-  };
+  }, [currentSalonId]);
 
-  const refreshData = async (targetSalonId?: string, targetUserId?: string) => {
+  const refreshData = useCallback(async (targetSalonId?: string, targetUserId?: string) => {
     try {
-      setLoading(true);
       const allSalons = await api.getSalons();
-      setSalons(allSalons);
+      setSalons((prev) => (areObjectsEqual(prev, allSalons) ? prev : allSalons));
 
       const effectiveSalonId = targetSalonId || currentSalonId;
       const activeSalon = allSalons.find((s) => s.id === effectiveSalonId) || allSalons[0];
@@ -290,12 +300,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           api.getAppointments(salonId),
           api.getSubscriptionPayments(salonId),
         ]);
-        setUsers(salonUsers);
-        setServices(salonServices);
-        setClients(salonClients);
-        setAppointments(salonAppointments);
-        setSubscriptionPayments(salonPayments);
-        setBillingConfig(api.getBillingConfig());
+        setUsers((prev) => (areObjectsEqual(prev, salonUsers) ? prev : salonUsers));
+        setServices((prev) => (areObjectsEqual(prev, salonServices) ? prev : salonServices));
+        setClients((prev) => (areObjectsEqual(prev, salonClients) ? prev : salonClients));
+        setAppointments((prev) => (areObjectsEqual(prev, salonAppointments) ? prev : salonAppointments));
+        setSubscriptionPayments((prev) => (areObjectsEqual(prev, salonPayments) ? prev : salonPayments));
+        const newBillingConfig = api.getBillingConfig();
+        setBillingConfig((prev) => (areObjectsEqual(prev, newBillingConfig) ? prev : newBillingConfig));
 
         const effectiveUserId = targetUserId || currentUserId;
         const matchedUser = salonUsers.find((u) => u.id === effectiveUserId);
@@ -305,21 +316,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         } else if (salonUsers.length > 0) {
           const adminFirst = salonUsers.find((u) => u.role === 'ADMIN') || salonUsers[0];
-          setCurrentUserIdState(adminFirst.id);
+          if (currentUserId !== adminFirst.id) {
+            setCurrentUserIdState(adminFirst.id);
+          }
         }
       } else {
-        setUsers([]);
-        setServices([]);
-        setClients([]);
-        setAppointments([]);
-        setSubscriptionPayments([]);
+        setUsers((prev) => (prev.length === 0 ? prev : []));
+        setServices((prev) => (prev.length === 0 ? prev : []));
+        setClients((prev) => (prev.length === 0 ? prev : []));
+        setAppointments((prev) => (prev.length === 0 ? prev : []));
+        setSubscriptionPayments((prev) => (prev.length === 0 ? prev : []));
       }
     } catch (err: any) {
       showNotification('error', err.message || 'Erro ao carregar dados.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentSalonId, currentUserId]);
 
   useEffect(() => {
     refreshData();

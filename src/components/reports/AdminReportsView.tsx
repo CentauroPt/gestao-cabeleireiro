@@ -86,7 +86,6 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
     isSubscriptionBlocked,
     hasPendingPayment,
     refreshSubscriptionData,
-    refreshData,
   } = useApp();
 
   const isTrialActive = currentSalon?.estado_subscricao === 'prova' && !isSubscriptionBlocked;
@@ -98,13 +97,10 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
     }
   }, [initialSection]);
 
-  // Sincronizar dados do salão e subscrições ao aceder à Área de Administrador
+  // Sincronizar dados de subscrição ao aceder à Área de Administrador
   React.useEffect(() => {
     refreshSubscriptionData();
-    if (currentSalon?.id) {
-      refreshData(currentSalon.id);
-    }
-  }, [currentSalon?.id, adminSection]);
+  }, [refreshSubscriptionData]);
 
   // Estados de Autenticação
   const salonAdmins = useMemo(() => {
