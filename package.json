@@ -1,7 +1,1 @@
-{
-  "name": "salaomaster-dist",
-  "private": true,
-  "scripts": {
-    "build": "echo 'Build already completed'"
-  }
-}
+{"name":"gestao-cabeleireiro-static","private":true,"scripts":{"build":"echo 'Static ready'"}}
