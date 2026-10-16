@@ -100,3 +100,29 @@ export function checkAppointmentConflict(params: {
 
   return { hasConflict: false, hasOverlap: false };
 }
+
+/**
+ * Verifica se uma reserva é considerada passada.
+ * Regra:
+ * - Se a data for anterior ao dia de hoje -> Passada (não pode ser apagada por ninguém)
+ * - Se a data for posterior ao dia de hoje -> Não é passada
+ * - Se for no dia de hoje: se o horário for anterior ao horário que decorre no momento -> Passada (não pode ser apagada por ninguém)
+ */
+export function isPastAppointment(apt: { date: string; startTime?: string; endTime?: string }): boolean {
+  if (!apt || !apt.date) return false;
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
+  if (apt.date < todayStr) return true;
+  if (apt.date > todayStr) return false;
+
+  const currentH = String(now.getHours()).padStart(2, '0');
+  const currentM = String(now.getMinutes()).padStart(2, '0');
+  const nowTime = `${currentH}:${currentM}`;
+
+  const aptTime = apt.startTime || apt.endTime || '00:00';
+  return aptTime < nowTime;
+}

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { Appointment, Client } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { AppointmentModal } from './AppointmentModal';
+import { isPastAppointment } from '../../services/conflictValidator';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -260,8 +261,8 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
   // Clique num slot vazio para agendar (não são permitidas marcações para dias anteriores ao dia atual)
   const handleSlotClick = (time: string, userId: string, dateStr?: string) => {
     const targetDate = dateStr || currentDateStr;
-    if (targetDate < todayStr) {
-      alert('Não são permitidas marcações para dias anteriores ao dia atual.');
+    if (isPastAppointment({ date: targetDate, startTime: time })) {
+      alert('Não são permitidas marcações para horários ou dias passados.');
       return;
     }
     setSelectedAppointment(null);
@@ -564,7 +565,8 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
                           const prof = users.find((u) => u.id === aptAtSlot.userId);
                           const widthPct = 100 / totalCols;
                           const leftPct = colIndex * widthPct;
-                          const isLocked = aptAtSlot.status === 'CONCLUIDA' || aptAtSlot.date < todayStr;
+                          const isPast = isPastAppointment(aptAtSlot);
+                          const isLocked = aptAtSlot.status === 'CONCLUIDA' || isPast;
                           return (
                             <div
                               key={aptAtSlot.id}
@@ -584,8 +586,8 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
                               }}
                               onClick={(e) => handleAppointmentClick(aptAtSlot, e)}
                               title={
-                                aptAtSlot.date < todayStr
-                                  ? `${aptAtSlot.clientName} (${aptAtSlot.startTime} - ${aptAtSlot.endTime}) — Reserva anterior ao dia atual (apenas consulta)`
+                                isPast
+                                  ? `${aptAtSlot.clientName} (${aptAtSlot.startTime} - ${aptAtSlot.endTime}) — Reserva já passada (apenas consulta)`
                                   : `${aptAtSlot.clientName} (${aptAtSlot.startTime} - ${aptAtSlot.endTime}) — Clique para editar reserva ou arraste para mover`
                               }
                               className={`absolute z-10 p-1.5 rounded-xl text-left shadow-xs border transition-all overflow-hidden flex flex-col justify-between ${
@@ -765,7 +767,8 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
                         ({ apt: aptAtSlot, topPx, heightPx, colIndex, totalCols }) => {
                           const widthPct = 100 / totalCols;
                           const leftPct = colIndex * widthPct;
-                          const isLocked = aptAtSlot.status === 'CONCLUIDA' || aptAtSlot.date < todayStr;
+                          const isPast = isPastAppointment(aptAtSlot);
+                          const isLocked = aptAtSlot.status === 'CONCLUIDA' || isPast;
                           return (
                             <div
                               key={aptAtSlot.id}
@@ -785,8 +788,8 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
                               }}
                               onClick={(e) => handleAppointmentClick(aptAtSlot, e)}
                               title={
-                                aptAtSlot.date < todayStr
-                                  ? `${aptAtSlot.clientName} (${aptAtSlot.startTime} - ${aptAtSlot.endTime}) — Reserva anterior ao dia atual (apenas consulta)`
+                                isPast
+                                  ? `${aptAtSlot.clientName} (${aptAtSlot.startTime} - ${aptAtSlot.endTime}) — Reserva já passada (apenas consulta)`
                                   : `${aptAtSlot.clientName} (${aptAtSlot.startTime} - ${aptAtSlot.endTime}) — Clique para editar horários ou arraste para mover`
                               }
                               className={`absolute z-10 p-2 rounded-xl text-left shadow-xs border transition-all overflow-hidden flex flex-col justify-between ${
@@ -934,7 +937,7 @@ export const CalendarView: React.FC<Props> = ({ initialClientToBook, onClearInit
                       </div>
 
                       <div className="flex items-center gap-3">
-                        {apt.status !== 'CONCLUIDA' && apt.date >= todayStr && (
+                        {apt.status !== 'CONCLUIDA' && !isPastAppointment(apt) && (
                           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"

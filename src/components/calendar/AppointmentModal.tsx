@@ -6,6 +6,7 @@ import {
   checkAppointmentConflict,
   calculateEndTime,
   calculateDurationMinutes,
+  isPastAppointment as checkIsPastAppointment,
 } from '../../services/conflictValidator';
 import {
   X,
@@ -50,7 +51,6 @@ export const AppointmentModal: React.FC<Props> = ({
     staffMembers,
     services,
     appointments,
-    currentUser,
     addAppointment,
     updateAppointmentTimes,
     deleteAppointment,
@@ -68,7 +68,9 @@ export const AppointmentModal: React.FC<Props> = ({
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
-  const isPastAppointment = !!(initialAppointment && initialAppointment.date < todayStr);
+  const isPastAppointment = useMemo(() => {
+    return initialAppointment ? checkIsPastAppointment(initialAppointment) : false;
+  }, [initialAppointment]);
 
   // Estados do formulário (quando aberto a partir da ficha de um cliente, o nome do cliente aparece automaticamente)
   const [clientId, setClientId] = useState<string>(
@@ -339,10 +341,6 @@ export const AppointmentModal: React.FC<Props> = ({
 
   const handleDelete = async () => {
     if (!initialAppointment || isPastAppointment) return;
-    if (currentUser?.role !== 'ADMIN') {
-      alert('Acesso negado: Apenas o Administrador de cada salão tem permissão para eliminar reservas.');
-      return;
-    }
     if (confirm('Tem a certeza que deseja eliminar esta reserva da agenda?')) {
       const success = await deleteAppointment(initialAppointment.id);
       if (success) {
@@ -353,7 +351,7 @@ export const AppointmentModal: React.FC<Props> = ({
   };
 
   const handleComplete = async () => {
-    if (!initialAppointment || isPastAppointment) return;
+    if (!initialAppointment) return;
     if (confirm('Marcar serviço como concluído? Isto irá somar o valor à ficha do cliente e atualizar a data da última visita.')) {
       const success = await completeAppointment(initialAppointment.id);
       if (success) {
@@ -375,14 +373,14 @@ export const AppointmentModal: React.FC<Props> = ({
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-purple-600" />
               {isPastAppointment
-                ? 'Consulta de Reserva (Data Passada)'
+                ? 'Consulta de Reserva (Já Passada)'
                 : isEditing
                 ? 'Editar Reserva & Horários'
                 : 'Nova Marcação'}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {isPastAppointment
-                ? 'As reservas anteriores ao dia atual não podem ser alteradas nem apagadas.'
+                ? 'As reservas passadas não podem ser eliminadas.'
                 : 'Ajuste livre da hora de início e fim (permite tarefas sobrepostas por colaborador).'}
             </p>
           </div>
@@ -398,7 +396,7 @@ export const AppointmentModal: React.FC<Props> = ({
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           {isPastAppointment && (
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium">
-              As reservas anteriores ao dia atual não podem ser alteradas nem apagadas.
+              Esta reserva é passada (horário anterior ao momento atual). As reservas passadas não podem ser eliminadas por nenhum utilizador.
             </div>
           )}
           {/* Seletor de Cliente, Pesquisa & Ícone para Registar Novo Cliente */}
@@ -861,20 +859,21 @@ export const AppointmentModal: React.FC<Props> = ({
           </button>
 
           <div className="flex items-center gap-2">
-            {isEditing && !isPastAppointment && (
+            {isEditing && (
               <>
-                {/* Confirmar / Guardar Alterações de Reserva */}
-                <button
-                  type="button"
-                  onClick={handleUpdateExisting}
-                  disabled={isSubmitting}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer transition-all"
-                >
-                  <Save className="w-4 h-4" />
-                  {isSubmitting ? 'A gravar...' : 'Confirmar Reserva'}
-                </button>
+                {!isPastAppointment && (
+                  <button
+                    type="button"
+                    onClick={handleUpdateExisting}
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer transition-all"
+                  >
+                    <Save className="w-4 h-4" />
+                    {isSubmitting ? 'A gravar...' : 'Confirmar Reserva'}
+                  </button>
+                )}
 
-                {/* Concluir Serviço */}
+                {/* Concluir Serviço (Permitido mesmo se for reserva passada, desde que ainda não esteja concluída) */}
                 {initialAppointment?.status !== 'CONCLUIDA' && (
                   <button
                     type="button"
@@ -886,32 +885,27 @@ export const AppointmentModal: React.FC<Props> = ({
                   </button>
                 )}
 
-                {/* Eliminar Reserva (Admin Only) */}
-                {currentUser?.role === 'ADMIN' ? (
+                {/* Eliminar Reserva: Permitido para todos exceto em reservas passadas */}
+                {!isPastAppointment ? (
                   <button
                     type="button"
                     onClick={handleDelete}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer transition-all"
+                    title="Eliminar esta reserva da agenda"
                   >
                     <Trash2 className="w-4 h-4" />
                     Eliminar
                   </button>
                 ) : (
                   <span
-                    className="inline-flex items-center gap-1 px-3 py-2 bg-slate-100 text-slate-400 rounded-xl text-xs font-semibold cursor-not-allowed border border-slate-200"
-                    title="Apenas o administrador do salão tem permissão para eliminar reservas."
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 text-slate-500 rounded-xl text-xs font-semibold border border-slate-200 cursor-not-allowed"
+                    title="As reservas passadas não podem ser eliminadas."
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Bloqueado (Admin)
+                    <Trash2 className="w-3.5 h-3.5 text-slate-400" />
+                    Reserva passada (Bloqueada para eliminação)
                   </span>
                 )}
               </>
-            )}
-
-            {isEditing && isPastAppointment && (
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 text-slate-500 rounded-xl text-xs font-semibold border border-slate-200 cursor-not-allowed">
-                Reserva anterior ao dia atual (Bloqueada)
-              </span>
             )}
 
             {!isEditing && (

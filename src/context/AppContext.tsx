@@ -24,6 +24,7 @@ import {
   calculateEndTime,
   calculateDurationMinutes,
   addMinutesToTime,
+  isPastAppointment,
 } from '../services/conflictValidator';
 
 export type AppMode = 'landing' | 'salon' | 'developer';
@@ -579,15 +580,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const apt = appointments.find((a) => a.id === appointmentId);
     if (!apt) return false;
 
-    const todayStr = getTodayLocalStr();
-    if (apt.date < todayStr) {
-      showNotification('error', 'As reservas anteriores ao dia atual não podem ser alteradas.');
+    if (isPastAppointment(apt)) {
+      showNotification('error', 'As reservas passadas não podem ser alteradas.');
       return false;
     }
 
     const targetDate = newDate || apt.date;
-    if (targetDate < todayStr) {
-      showNotification('error', 'Não é possível mover reservas para datas anteriores ao dia atual.');
+    if (isPastAppointment({ date: targetDate, startTime: newStartTime })) {
+      showNotification('error', 'Não é possível mover reservas para horários passados.');
       return false;
     }
 
@@ -616,9 +616,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const apt = appointments.find((a) => a.id === appointmentId);
     if (!apt) return false;
 
-    const todayStr = getTodayLocalStr();
-    if (apt.date < todayStr) {
-      showNotification('error', 'As reservas anteriores ao dia atual não podem ser alteradas.');
+    if (isPastAppointment(apt)) {
+      showNotification('error', 'As reservas passadas não podem ser alteradas.');
       return false;
     }
 
@@ -654,9 +653,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const apt = appointments.find((a) => a.id === params.appointmentId);
     if (!apt) return false;
 
-    const todayStr = getTodayLocalStr();
-    if (apt.date < todayStr) {
-      showNotification('error', 'As reservas anteriores ao dia atual não podem ser alteradas.');
+    if (isPastAppointment(apt)) {
+      showNotification('error', 'As reservas passadas não podem ser alteradas.');
       return false;
     }
 
@@ -706,13 +704,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteAppointment = async (id: string): Promise<boolean> => {
     if (!currentUser) return false;
     const apt = appointments.find((a) => a.id === id);
-    if (apt && apt.date < getTodayLocalStr()) {
-      showNotification('error', 'As reservas anteriores ao dia atual não podem ser apagadas.');
-      return false;
-    }
+    if (!apt) return false;
 
-    if (currentUser.role !== 'ADMIN') {
-      showNotification('error', 'Apenas o Administrador do salão pode apagar ou cancelar reservas.');
+    // As únicas reservas que nunca ninguém pode apagar são as reservas já passadas
+    if (isPastAppointment(apt)) {
+      showNotification('error', 'As reservas passadas não podem ser eliminadas.');
       return false;
     }
 

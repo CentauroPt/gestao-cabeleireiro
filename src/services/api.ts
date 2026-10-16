@@ -22,6 +22,7 @@ import {
   idbSet,
 } from './storageEngine';
 import { supabaseService } from './supabase';
+import { isPastAppointment } from './conflictValidator';
 
 export interface SalonSummary {
   salon: Salon;
@@ -893,25 +894,26 @@ export class ApiService {
     return newAppointment;
   }
 
-  async updateAppointment(currentUserRole: string, id: string, data: Partial<Appointment>): Promise<Appointment> {
+  async updateAppointment(_currentUserRole: string, id: string, data: Partial<Appointment>): Promise<Appointment> {
     this.reloadFromStorage();
     const index = this.appointments.findIndex((a) => a.id === id);
     if (index === -1) throw new Error('Reserva não encontrada.');
-
-    if (data.status === 'CANCELADA' && currentUserRole !== 'ADMIN') {
-      throw new Error('Apenas o Administrador tem permissão para cancelar ou apagar reservas.');
-    }
 
     this.appointments[index] = { ...this.appointments[index], ...data };
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments);
     return this.appointments[index];
   }
 
-  async deleteAppointment(currentUserRole: string, id: string): Promise<void> {
+  async deleteAppointment(_currentUserRole: string, id: string): Promise<void> {
     this.reloadFromStorage();
-    if (currentUserRole !== 'ADMIN') {
-      throw new Error('Acesso negado: Apenas o Administrador de cada cabeleireiro poderá apagar reservas.');
+    const apt = this.appointments.find((a) => a.id === id);
+    if (!apt) throw new Error('Reserva não encontrada.');
+
+    // As únicas reservas que nunca ninguém pode apagar são as reservas já passadas
+    if (isPastAppointment(apt)) {
+      throw new Error('Não é permitido apagar reservas passadas.');
     }
+
     this.appointments = this.appointments.filter((a) => a.id !== id);
     saveToStorage(STORAGE_KEYS.APPOINTMENTS, this.appointments, true);
   }
