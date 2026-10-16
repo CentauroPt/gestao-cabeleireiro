@@ -1,4 +1,4 @@
-# SalonMaster Pro - Sistema de Gestão & Agendamento para Salões de Cabeleireiro
+# SalãoMaster Pro - Sistema de Gestão & Agendamento para Salões de Cabeleireiro
 
 [![Versão](https://img.shields.io/badge/Vers%C3%A3o-V1.7.35-8B5CF6.svg)](https://github.com/CentauroPt/gestao-cabeleireiro)
 [![React](https://img.shields.io/badge/React-19.2-61DAFB.svg?logo=react&logoColor=black)](https://react.dev/)
@@ -10,7 +10,7 @@
 [![Autor](https://img.shields.io/badge/Autor-Jos%C3%A9_Cent%C3%BArio-purple.svg)](#-direitos-de-autor--propriedade-intelectual)
 [![Plataforma](https://img.shields.io/badge/Plataforma-100%25_Web-success.svg)](#-arquitetura-t%C3%A9cnica)
 
-> **SalonMaster Pro** é uma solução web corporativa de agendamento, fidelização de clientes e gestão empresarial desenvolvida à medida para salões de cabeleireiro, barbearias e espaços de estética. Projetada sob uma arquitetura **Multi-Tenant com isolamento rigoroso de dados**, combina controlo de acessos por funções (**RBAC**), agendamento inteligente anti-sobreposição, gestão técnica de clientes (CRM) e um sistema completo de **checkout bancário online com desbloqueio automático imediato via webhook bancário idempotente**.
+> **SalãoMaster Pro** é uma solução web corporativa de agendamento, fidelização de clientes e gestão empresarial desenvolvida à medida para salões de cabeleireiro, barbearias e espaços de estética. Projetada sob uma arquitetura **Multi-Tenant com isolamento rigoroso de dados**, combina controlo de acessos por funções (**RBAC**), agendamento inteligente anti-sobreposição, gestão técnica de clientes (CRM) e um sistema completo de **checkout bancário online com desbloqueio automático imediato via webhook bancário idempotente**.
 
 ---
 
@@ -37,7 +37,7 @@
 
 ## 🎯 Visão Geral & Proposta de Valor
 
-O **SalonMaster Pro** resolve os desafios centrais da operação diária de um salão de beleza moderno:
+O **SalãoMaster Pro** resolve os desafios centrais da operação diária de um salão de beleza moderno:
 
 - **100% Web & Responsivo:** Opera nativamente em qualquer navegador moderno (computadores, tablets e telemóveis) sem necessidade de instalação de binários ou executáveis locais.
 - **Multi-Tenant Isolado:** Cada salão registado possui o seu identificador próprio (`salonId`), garantindo confidencialidade e total segregação de clientes, agendamentos, faturação e colaboradores.
@@ -191,7 +191,7 @@ O processo de pagamento e desbloqueio obedece a um fluxo rigoroso e idempotente:
 sequenceDiagram
     autonumber
     actor Cliente as Cliente / Administrador do Salão
-    participant App as SalonMaster Pro (Frontend)
+    participant App as SalãoMaster Pro (Frontend)
     participant Gateway as Gateway Bancário (Stripe)
     participant Edge as Edge Function (webhook-banco)
     participant DB as Postgres / Supabase
@@ -283,7 +283,7 @@ STRIPE_WEBHOOK_SECRET=whsec_sua_chave_secreta_webhook
 ```
 
 > [!NOTE]
-> Se as variáveis do Supabase não forem fornecidas, o **SalonMaster Pro** ativa de forma automática e transparente o seu **motor local de persistência (LocalStorage + IndexedDB)**, permitindo testes completos e demonstração de todas as funcionalidades de forma 100% autónoma.
+> Se as variáveis do Supabase não forem fornecidas, o **SalãoMaster Pro** ativa de forma automática e transparente o seu **motor local de persistência (LocalStorage + IndexedDB)**, permitindo testes completos e demonstração de todas as funcionalidades de forma 100% autónoma.
 
 ---
 

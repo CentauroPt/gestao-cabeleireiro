@@ -110,7 +110,7 @@ export const Navbar: React.FC = () => {
             )}
             <div>
               <span className="font-bold text-lg text-slate-900 tracking-tight flex items-center gap-2">
-                {currentSalon?.name || 'SalonMaster Pro'}
+                {currentSalon?.name || 'SalãoMaster Pro'}
               </span>
               <p className="text-xs text-slate-500 hidden sm:block">Gestão de Clientes, Reservas & Equipa</p>
             </div>
