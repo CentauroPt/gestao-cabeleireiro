@@ -27,6 +27,9 @@ import {
   Palette,
   ShieldCheck,
   CreditCard,
+  Monitor,
+  FileText,
+  X,
 } from 'lucide-react';
 import { SalonCustomizationModal } from '../salon/SalonCustomizationModal';
 import { MyPaymentsView } from '../subscription/MyPaymentsView';
@@ -103,6 +106,18 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
+
+  // Estados para Modal de Opções de Impressão (Ecrã vs Relatório de Estatística)
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printMode, setPrintMode] = useState<'screen' | 'report'>('report');
+
+  const handleExecutePrint = (mode: 'screen' | 'report') => {
+    setPrintMode(mode);
+    setIsPrintModalOpen(false);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
 
   // Pré-selecionar email do administrador atual se disponível
   React.useEffect(() => {
@@ -263,6 +278,50 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
 
   const activeClientsInPeriod = useMemo(() => {
     return new Set(filteredSales.map((s) => s.clientId)).size;
+  }, [filteredSales]);
+
+  // Agrupar vendas por mês para a Folha Oficial de Impressão Estatística
+  const salesGroupedByMonth = useMemo(() => {
+    const map = new Map<string, { label: string; sales: SalesTransaction[]; total: number }>();
+
+    filteredSales.forEach((sale) => {
+      const monthKey = sale.monthStr || sale.dateStr.slice(0, 7) || 'Geral';
+      let label = monthKey;
+      if (monthKey.includes('-')) {
+        const [y, m] = monthKey.split('-');
+        const mObj = MONTHS_PT.find((item) => item.value === m);
+        label = `${mObj?.name || m} de ${y}`;
+      }
+
+      if (!map.has(monthKey)) {
+        map.set(monthKey, { label, sales: [], total: 0 });
+      }
+      const g = map.get(monthKey)!;
+      g.sales.push(sale);
+      g.total += sale.amount;
+    });
+
+    return Array.from(map.entries()).map(([key, data]) => ({
+      key,
+      label: data.label,
+      sales: data.sales,
+      total: data.total,
+    }));
+  }, [filteredSales]);
+
+  // Resumo de Vendas por Profissional para o Relatório Formal
+  const staffSalesSummary = useMemo(() => {
+    const map = new Map<string, { name: string; count: number; total: number }>();
+    filteredSales.forEach((s) => {
+      const pName = s.professionalName || 'Profissional';
+      if (!map.has(pName)) {
+        map.set(pName, { name: pName, count: 0, total: 0 });
+      }
+      const entry = map.get(pName)!;
+      entry.count += 1;
+      entry.total += s.amount;
+    });
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [filteredSales]);
 
   // Funções auxiliares de filtro rápido
@@ -461,10 +520,11 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
           </button>
           {adminSection === 'reports' && (
             <button
-              onClick={() => window.print()}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+              onClick={() => setIsPrintModalOpen(true)}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer border border-slate-200"
+              title="Opções de impressão de estatística"
             >
-              <Printer className="w-4 h-4" /> Imprimir Relatório
+              <Printer className="w-4 h-4" /> Imprimir Estatística
             </button>
           )}
           <button
@@ -518,7 +578,9 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
         <MyPaymentsView />
       ) : (
         <>
-      {/* Cartão de Personalização do Salão e Início de Semana na Página do Administrador */}
+          {/* Contentor Interativo de Ecrã (oculto se o utilizador escolheu Relatório Formal) */}
+          <div className={printMode === 'report' ? 'print:hidden space-y-6' : 'space-y-6'}>
+            {/* Cartão de Personalização do Salão e Início de Semana na Página do Administrador */}
       <div className="bg-gradient-to-r from-purple-50/70 via-indigo-50/50 to-slate-50 border border-purple-200/80 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           {currentSalon?.logoUrl ? (
@@ -1831,7 +1893,349 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
           </div>
         );
       })()}
+          </div>
+
+          {/* ========================================================
+              FOLHA FORMAL DE RELATÓRIO DE ESTATÍSTICA (APENAS NA IMPRESSÃO SE printMode === 'report')
+              Folha A4 formal e discriminada por Mês e por Data, com
+              Logótipo do Salão, Dados Fiscais, Indicadores (KPIs),
+              Tabela de Vendas e Validação.
+              ======================================================== */}
+          <div
+            className={
+              printMode === 'report'
+                ? 'hidden print:block bg-white text-slate-900 w-full font-sans text-xs'
+                : 'hidden'
+            }
+          >
+            {/* Cabeçalho Formal com Logótipo do Salão e Metadados */}
+            <div className="border-b-2 border-slate-900 pb-5 mb-5 flex items-start justify-between gap-6">
+              {/* Lado Esquerdo: Logótipo e Identificação do Salão */}
+              <div className="flex items-center gap-4">
+                {currentSalon?.logoUrl ? (
+                  <img
+                    src={currentSalon.logoUrl}
+                    alt={currentSalon.name}
+                    className="w-16 h-16 object-contain rounded-xl border border-slate-300 p-1 bg-white shrink-0"
+                  />
+                ) : (
+                  <div
+                    className="w-16 h-16 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-xs shrink-0"
+                    style={{ backgroundColor: currentSalon?.primaryColor || '#8B5CF6' }}
+                  >
+                    <Scissors className="w-8 h-8 -rotate-45" />
+                  </div>
+                )}
+                <div>
+                  <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                    {currentSalon?.name || 'Salão de Cabeleireiro'}
+                  </h1>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {currentSalon?.address || 'Morada não especificada'}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500 mt-1">
+                    {currentSalon?.nif && (
+                      <span>
+                        <strong>NIF:</strong> {currentSalon.nif}
+                      </span>
+                    )}
+                    {currentSalon?.phone && (
+                      <span>
+                        <strong>Tel:</strong> {currentSalon.phone}
+                      </span>
+                    )}
+                    {currentSalon?.email && (
+                      <span>
+                        <strong>Email:</strong> {currentSalon.email}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Lado Direito: Identificação do Documento */}
+              <div className="text-right shrink-0">
+                <span className="inline-block px-3 py-1 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-md mb-1.5">
+                  Relatório Oficial
+                </span>
+                <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                  Estatística & Faturação
+                </h2>
+                <p className="text-[11px] text-slate-600 mt-0.5 font-mono">
+                  Doc. Nº:{' '}
+                  <strong>
+                    EST-
+                    {String(currentSalon?.id || '001')
+                      .replace(/\D/g, '')
+                      .slice(-5) || '1001'}
+                    /{new Date().getFullYear()}
+                  </strong>
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Emitido em: {new Date().toLocaleDateString('pt-PT')} às{' '}
+                  {new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+            </div>
+
+            {/* Quadro Resumo de Indicadores Chave (KPIs) */}
+            <div className="grid grid-cols-4 gap-3 mb-6 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Faturação Total</span>
+                <span className="text-sm font-black text-emerald-700">{totalRevenue.toFixed(2)} €</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Total Intervenções</span>
+                <span className="text-sm font-black text-slate-900">{totalProcedures} serviços</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Ticket Médio</span>
+                <span className="text-sm font-black text-purple-700">{averageTicket.toFixed(2)} €</span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Clientes Ativos</span>
+                <span className="text-sm font-black text-slate-900">{activeClientsInPeriod} clientes</span>
+              </div>
+            </div>
+
+            {/* Resumo por Colaborador */}
+            {staffSalesSummary.length > 0 && (
+              <div className="mb-5">
+                <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-800 mb-1.5">
+                  Desempenho por Colaborador
+                </h4>
+                <table className="w-full text-left border-collapse border border-slate-300 text-[10px]">
+                  <thead>
+                    <tr className="bg-slate-100 font-black uppercase text-slate-700 border-b border-slate-300">
+                      <th className="py-1.5 px-2.5 border-r border-slate-200">Colaborador / Profissional</th>
+                      <th className="py-1.5 px-2.5 text-center border-r border-slate-200">Serviços Realizados</th>
+                      <th className="py-1.5 px-2.5 text-right border-r border-slate-200">Total Faturado</th>
+                      <th className="py-1.5 px-2.5 text-right">% do Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staffSalesSummary.map((staff) => {
+                      const pct = totalRevenue > 0 ? (staff.total / totalRevenue) * 100 : 0;
+                      return (
+                        <tr key={staff.name} className="border-b border-slate-200">
+                          <td className="py-1.5 px-2.5 font-bold text-slate-800 border-r border-slate-200">
+                            {staff.name}
+                          </td>
+                          <td className="py-1.5 px-2.5 text-center font-semibold text-slate-700 border-r border-slate-200">
+                            {staff.count} intervenção{staff.count > 1 ? 'ões' : ''}
+                          </td>
+                          <td className="py-1.5 px-2.5 text-right font-black text-slate-900 border-r border-slate-200">
+                            {staff.total.toFixed(2)} €
+                          </td>
+                          <td className="py-1.5 px-2.5 text-right font-bold text-purple-700">
+                            {pct.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Tabela Discriminada por Mês e por Data */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                  Discriminação de Vendas por Período & Datas
+                </h3>
+                <span className="text-[10px] text-slate-500">
+                  Filtro: {activeFilterDescription}
+                </span>
+              </div>
+
+              <table className="w-full text-left border-collapse border border-slate-300">
+                <thead>
+                  <tr className="bg-slate-100 text-[10px] font-black uppercase text-slate-700 border-b border-slate-300">
+                    <th className="py-2 px-3 border-r border-slate-200">Data</th>
+                    <th className="py-2 px-3 border-r border-slate-200">Cliente</th>
+                    <th className="py-2 px-3 border-r border-slate-200">Profissional</th>
+                    <th className="py-2 px-3 border-r border-slate-200">Serviços Executados</th>
+                    <th className="py-2 px-3 text-right">Valor (€)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesGroupedByMonth.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-6 text-center text-slate-400 italic">
+                        Sem registos de vendas para o período selecionado.
+                      </td>
+                    </tr>
+                  ) : (
+                    salesGroupedByMonth.map((group) => (
+                      <React.Fragment key={group.key}>
+                        {/* Linha de Cabeçalho do Mês */}
+                        <tr className="bg-slate-100/90 border-t-2 border-b border-slate-300 text-[11px] font-black text-slate-900">
+                          <td colSpan={4} className="py-2 px-3 border-r border-slate-200">
+                            <span className="text-purple-950 uppercase font-black tracking-wide">
+                              Mês: {group.label}
+                            </span>
+                            <span className="text-[10px] font-normal text-slate-600 ml-2">
+                              ({group.sales.length} intervenção{group.sales.length > 1 ? 'ões' : ''})
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-right font-black text-slate-900">
+                            {group.total.toFixed(2)} €
+                          </td>
+                        </tr>
+
+                        {/* Linhas das Vendas com data exata */}
+                        {group.sales.map((s) => {
+                          const dateFormatted = s.dateStr
+                            ? new Date(s.dateStr).toLocaleDateString('pt-PT', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })
+                            : s.dateStr;
+                          return (
+                            <tr key={s.id} className="border-b border-slate-200 text-[11px] hover:bg-slate-50">
+                              <td className="py-2 px-3 font-mono text-slate-700 border-r border-slate-200">
+                                {dateFormatted}
+                              </td>
+                              <td className="py-2 px-3 font-bold text-slate-800 border-r border-slate-200">
+                                {s.clientName}
+                              </td>
+                              <td className="py-2 px-3 text-slate-700 border-r border-slate-200">
+                                {s.professionalName}
+                              </td>
+                              <td className="py-2 px-3 text-slate-600 border-r border-slate-200">
+                                {s.services.length > 0 ? s.services.join(', ') : 'Serviço Geral'}
+                              </td>
+                              <td className="py-2 px-3 text-right font-black text-slate-900">
+                                {s.amount.toFixed(2)} €
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))
+                  )}
+                </tbody>
+                {filteredSales.length > 0 && (
+                  <tfoot>
+                    <tr className="bg-slate-100 border-t-2 border-slate-900 font-black text-xs text-slate-900">
+                      <td colSpan={4} className="py-2.5 px-3 uppercase tracking-wider border-r border-slate-200">
+                        Total Geral Faturado ({totalProcedures} serviços realizados)
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-sm text-emerald-800">
+                        {totalRevenue.toFixed(2)} €
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+
+            {/* Rodapé Formal com Observações e Espaço para Carimbo / Assinatura */}
+            <div className="pt-4 border-t border-slate-300 mt-6 flex items-end justify-between text-[10px] text-slate-500">
+              <div className="max-w-md space-y-1">
+                <p className="font-bold text-slate-700 uppercase tracking-wider">
+                  Conformidade e Registo:
+                </p>
+                <p className="leading-snug">
+                  Este relatório estatístico e financeiro comprova as receitas e serviços processados na gestão do salão.
+                  Documento processado por computador com autenticação digital de registos.
+                </p>
+              </div>
+
+              <div className="text-center w-64 pt-6 border-t border-slate-400">
+                <p className="text-[10px] font-bold text-slate-700">Assinatura / Carimbo do Administrador</p>
+                <p className="text-[9px] text-slate-400 mt-1">Data: ____ / ____ / {new Date().getFullYear()}</p>
+              </div>
+            </div>
+          </div>
         </>
+      )}
+
+      {/* Modal de Escolha de Formato de Impressão */}
+      {isPrintModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 print:hidden animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Imprimir Estatística
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Selecione o formato de impressão pretendido
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {/* Opção 1: Relatório de Estatística Formal */}
+              <button
+                type="button"
+                onClick={() => handleExecutePrint('report')}
+                className="w-full text-left p-4 rounded-2xl border-2 border-purple-200 bg-purple-50/40 hover:bg-purple-50 hover:border-purple-400 transition-all cursor-pointer group flex items-start gap-3.5"
+              >
+                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-300">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-sm text-slate-900 group-hover:text-purple-700">
+                      Relatório de Estatística
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200/70 text-purple-800">
+                      Recomendado
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 leading-snug">
+                    Folha formal A4 com logótipo do salão, discriminação detalhada por período e datas, indicadores de desempenho e campo para assinatura/carimbo.
+                  </p>
+                </div>
+              </button>
+
+              {/* Opção 2: Imprimir Ecrã */}
+              <button
+                type="button"
+                onClick={() => handleExecutePrint('screen')}
+                className="w-full text-left p-4 rounded-2xl border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all cursor-pointer group flex items-start gap-3.5"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-slate-200">
+                  <Monitor className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-sm text-slate-900 group-hover:text-slate-900">
+                    Imprimir Ecrã
+                  </span>
+                  <p className="text-xs text-slate-500 mt-1 leading-snug">
+                    Imprime numa folha A4 a vista atual do ecrã adaptando o conteúdo da tabela e filtros ao tamanho da página.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <div className="mt-6 pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal de Personalização de Cores e Logótipo do Salão */}
