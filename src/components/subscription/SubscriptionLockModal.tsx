@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { api } from '../../services/api';
 import type { PaymentMethod } from '../../types';
 import {
   CreditCard,
@@ -10,6 +11,9 @@ import {
   Send,
   Clock,
   ShieldCheck,
+  CheckCircle2,
+  RefreshCw,
+  MessageCircle,
 } from 'lucide-react';
 
 interface SubscriptionLockModalProps {
@@ -29,6 +33,7 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
     currentSalon,
     hasPendingPayment,
     createSubscriptionPayment,
+    refreshSubscriptionData,
   } = useApp();
 
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
@@ -36,9 +41,73 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [unblockedSuccess, setUnblockedSuccess] = useState(false);
 
-  // Se não estiver bloqueado e não foi forçado a abrir, não renderiza
-  const isOpen = forceOpen || isSubscriptionBlocked;
+  const prevBlockedRef = useRef<boolean>(isSubscriptionBlocked);
+
+  // Se não estiver bloqueado e não foi forçado a abrir, e não acabou de desbloquear, não renderiza
+  const isOpen = forceOpen || isSubscriptionBlocked || unblockedSuccess;
+
+  // Deteção reativa de desbloqueio automático (p. ex., programador validou pagamento na consola)
+  useEffect(() => {
+    if (prevBlockedRef.current && !isSubscriptionBlocked) {
+      setUnblockedSuccess(true);
+      const timer = setTimeout(() => {
+        setUnblockedSuccess(false);
+        if (onClose) onClose();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+    prevBlockedRef.current = isSubscriptionBlocked;
+  }, [isSubscriptionBlocked, onClose]);
+
+  // Sincronização em tempo real com as alterações do programador (IBAN, MB Way, Mensalidade, Validação)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const performSync = async () => {
+      await refreshSubscriptionData();
+      try {
+        const remoteChanged = await api.syncWithRemote();
+        if (remoteChanged) {
+          await refreshSubscriptionData();
+        }
+      } catch {
+        // Ignora erros de rede temporários
+      }
+    };
+
+    // Sincronizar de imediato
+    performSync();
+
+    // Sincronizar sempre que a janela ou aba ganha foco
+    const handleFocus = () => {
+      performSync();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    // Polling local suave a cada 2.5 segundos para refletir alterações imediatas da consola
+    const localPollId = setInterval(() => {
+      refreshSubscriptionData();
+    }, 2500);
+
+    // Sincronização remota (Supabase) a cada 6 segundos
+    const remotePollId = setInterval(() => {
+      api.syncWithRemote().then((changed) => {
+        if (changed) {
+          refreshSubscriptionData();
+        }
+      }).catch(() => {});
+    }, 6000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(localPollId);
+      clearInterval(remotePollId);
+    };
+  }, [isOpen, refreshSubscriptionData]);
+
   if (!isOpen) return null;
 
   const currentMonthStr = () => {
@@ -52,7 +121,25 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const formattedRate = (monthlyRate || 29.0).toFixed(2);
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await refreshSubscriptionData();
+      await api.syncWithRemote();
+      await refreshSubscriptionData();
+    } finally {
+      setTimeout(() => setIsManualRefreshing(false), 500);
+    }
+  };
+
+  // Preço efetivo: Prioridade para o valor específico do salão configurado pelo programador,
+  // ou valor mensal padrão das configurações de faturação, ou 29.00€
+  const effectiveRate =
+    currentSalon?.valor_mensal !== undefined
+      ? Number(currentSalon.valor_mensal)
+      : (monthlyRate || billingConfig?.valor_mensal_padrao || 29.0);
+  const formattedRate = effectiveRate.toFixed(2);
+
   const referenceCode = `SALON-${(currentSalon?.id || '001').replace('salon-', '').slice(-6)}-${currentMonthStr().replace('-', '')}`;
 
   const handleSubmitProof = async (e: React.FormEvent) => {
@@ -62,7 +149,7 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
     setIsSubmitting(true);
     try {
       const ok = await createSubscriptionPayment({
-        valor: monthlyRate || 29.0,
+        valor: effectiveRate,
         metodo: selectedMethod,
         mes_referencia: currentMonthStr(),
         comprovativo_ref: comprovativoRef.trim() || undefined,
@@ -81,28 +168,62 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
         {/* Top Header */}
         <div className="bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-700 p-6 text-white relative">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner">
-              <CreditCard className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner">
+                <CreditCard className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 border border-white/20">
+                  {subscriptionBlockReason === 'prova_expirada' ? 'Período de Teste' : 'Mensalidade SaaS'}
+                </span>
+                <h2 className="text-xl font-black mt-1 tracking-tight">
+                  Regularização de Subscrição
+                </h2>
+              </div>
             </div>
-            <div>
-              <span className="text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 border border-white/20">
-                {subscriptionBlockReason === 'prova_expirada' ? 'Período de Teste' : 'Mensalidade SaaS'}
-              </span>
-              <h2 className="text-xl font-black mt-1 tracking-tight">
-                Regularização de Subscrição
-              </h2>
-            </div>
+
+            <button
+              type="button"
+              onClick={handleManualRefresh}
+              disabled={isManualRefreshing}
+              title="Atualizar dados de pagamento em tempo real"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-white border border-white/20 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${isManualRefreshing ? 'animate-spin' : ''}`} />
+            </button>
           </div>
+
           {currentSalon && (
-            <p className="text-xs text-purple-200 font-medium mt-2">
-              Salão: <strong className="text-white">{currentSalon.name}</strong>
-            </p>
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
+              <p className="text-xs text-purple-200 font-medium">
+                Salão: <strong className="text-white">{currentSalon.name}</strong>
+              </p>
+              <div className="flex items-center gap-1.5 text-[10px] text-purple-200 font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Dados em tempo real</span>
+              </div>
+            </div>
           )}
         </div>
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
+          {/* Notificação de Desbloqueio Imediato */}
+          {unblockedSuccess && (
+            <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 text-emerald-950 flex items-start gap-3 animate-in zoom-in-95 duration-200 shadow-md">
+              <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="text-xs space-y-1">
+                <p className="font-black text-sm text-emerald-900">
+                  Pagamento validado com sucesso!
+                </p>
+                <p className="text-emerald-800 leading-relaxed font-medium">
+                  O salão foi desbloqueado pelo administrador. A fechar a janela para continuar a utilizar a aplicação...
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Mensagem Principal Conforme Requisitos */}
           <div className="bg-purple-50 border border-purple-200/80 rounded-2xl p-4 text-center">
             <p className="text-base sm:text-lg font-black text-purple-950">
@@ -117,7 +238,7 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
           </div>
 
           {/* Estado de Pagamento Pendente ou Recém-Submetido */}
-          {(hasPendingPayment || justSubmitted) && (
+          {(hasPendingPayment || justSubmitted) && !unblockedSuccess && (
             <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 text-amber-900 flex items-start gap-3">
               <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
               <div className="text-xs space-y-1">
@@ -197,7 +318,7 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
                 </span>
               </div>
 
-              {/* IBAN */}
+              {/* IBAN Atualizado em Tempo Real */}
               <div className="space-y-1">
                 <span className="text-[11px] font-bold text-slate-600">IBAN:</span>
                 <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-2.5">
@@ -257,7 +378,7 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
                 </span>
               </div>
 
-              {/* Número MB Way */}
+              {/* Número MB Way Atualizado em Tempo Real */}
               <div className="space-y-1">
                 <span className="text-[11px] font-bold text-slate-600">Número de Telemóvel MB Way:</span>
                 <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-2.5">
@@ -281,6 +402,24 @@ export const SubscriptionLockModal: React.FC<SubscriptionLockModalProps> = ({
                   Abra a app MB Way no seu telemóvel e envie {formattedRate}€ para o número acima.
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Suporte WhatsApp se configurado pelo programador */}
+          {billingConfig.numero_whatsapp && (
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-emerald-950 font-medium">
+                <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Dúvidas ou envio de comprovativo por WhatsApp?</span>
+              </div>
+              <a
+                href={`https://wa.me/${billingConfig.numero_whatsapp.replace(/\D/g, '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-white border border-emerald-300 px-2.5 py-1 rounded-lg shrink-0 ml-2 shadow-xs transition-colors"
+              >
+                {billingConfig.numero_whatsapp}
+              </a>
             </div>
           )}
 

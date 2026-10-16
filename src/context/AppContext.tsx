@@ -247,6 +247,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const config = api.getBillingConfig();
       setBillingConfig(config);
+      const allSalons = await api.getSalons();
+      setSalons(allSalons);
       if (currentSalonId) {
         const payments = await api.getSubscriptionPayments(currentSalonId);
         setSubscriptionPayments(payments);
@@ -1089,7 +1091,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const validateSubscriptionPayment = async (paymentId: string, notasAdmin?: string): Promise<boolean> => {
     try {
       await api.validateSubscriptionPayment(paymentId, notasAdmin);
-      await refreshData();
+      await refreshData(currentSalonId);
       await refreshAllSalonsSummary();
       showNotification('success', 'Pagamento validado com sucesso! O salão foi desbloqueado de imediato.');
       return true;
@@ -1103,6 +1105,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const updated = await api.updateBillingConfig(newConfig);
       setBillingConfig(updated);
+      await refreshData();
+      await refreshAllSalonsSummary();
       showNotification('success', 'Configurações de faturação atualizadas com sucesso.');
       return true;
     } catch (err: any) {
@@ -1117,7 +1121,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ): Promise<boolean> => {
     try {
       await api.updateSalonSubscription(salonId, updates);
-      await refreshData();
+      await refreshData(currentSalonId || salonId);
       await refreshAllSalonsSummary();
       showNotification('success', 'Ficha de subscrição atualizada com sucesso.');
       return true;

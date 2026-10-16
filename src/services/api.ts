@@ -18,6 +18,8 @@ import {
   saveMultipleToStorage,
   syncAndMergeStorage,
   onStorageSync,
+  notifyStorageSync,
+  idbSet,
 } from './storageEngine';
 import { supabaseService } from './supabase';
 
@@ -61,6 +63,11 @@ export class ApiService {
           this.reloadFromStorage();
         }
       });
+      this.syncWithRemote().then((changed) => {
+        if (changed) {
+          this.reloadFromStorage();
+        }
+      });
       // Escutar sincronizações
       onStorageSync(() => {
         this.reloadFromStorage();
@@ -73,6 +80,14 @@ export class ApiService {
    * para assegurar que múltiplas abas ou sessões nunca usem cache desatualizada.
    */
   public reloadFromStorage(): void {
+    try {
+      const savedConfig = localStorage.getItem(STORAGE_KEYS.BILLING_CONFIG);
+      if (savedConfig) {
+        this.billingConfig = { ...this.billingConfig, ...JSON.parse(savedConfig) };
+      }
+    } catch {}
+
+    const defaultRate = this.billingConfig.valor_mensal_padrao || 29.00;
     const rawSalons = loadFromLocalStorage<Salon>(STORAGE_KEYS.SALONS, []);
     this.salons = rawSalons.map((s) => {
       const regDate = s.data_registo || s.createdAt || new Date().toISOString();
@@ -85,7 +100,7 @@ export class ApiService {
         startDayOfWeek: s.startDayOfWeek !== undefined ? s.startDayOfWeek : 1,
         data_registo: regDate,
         fim_prova: trialEnd,
-        valor_mensal: s.valor_mensal !== undefined ? Number(s.valor_mensal) : 29.00,
+        valor_mensal: s.valor_mensal !== undefined ? Number(s.valor_mensal) : defaultRate,
         estado_subscricao: (s.estado_subscricao as SubscriptionStatus) || 'prova',
       };
     });
@@ -98,13 +113,6 @@ export class ApiService {
       STORAGE_KEYS.SUBSCRIPTION_PAYMENTS,
       []
     );
-
-    try {
-      const savedConfig = localStorage.getItem(STORAGE_KEYS.BILLING_CONFIG);
-      if (savedConfig) {
-        this.billingConfig = { ...this.billingConfig, ...JSON.parse(savedConfig) };
-      }
-    } catch {}
   }
 
   getBaseUrl(): string {
@@ -951,8 +959,63 @@ export class ApiService {
   async updateBillingConfig(newConfig: Partial<BillingConfig>): Promise<BillingConfig> {
     this.billingConfig = { ...this.billingConfig, ...newConfig };
     localStorage.setItem(STORAGE_KEYS.BILLING_CONFIG, JSON.stringify(this.billingConfig));
+    idbSet(STORAGE_KEYS.BILLING_CONFIG, this.billingConfig).catch(() => {});
+    notifyStorageSync();
     await supabaseService.syncBillingConfig(this.billingConfig).catch(() => {});
     return { ...this.billingConfig };
+  }
+
+  // Sincronizar dados e configurações com o Supabase em segundo plano
+  async syncWithRemote(): Promise<boolean> {
+    try {
+      let changed = false;
+      const remoteConfig = await supabaseService.fetchConfig();
+      if (remoteConfig) {
+        this.billingConfig = { ...this.billingConfig, ...remoteConfig };
+        localStorage.setItem(STORAGE_KEYS.BILLING_CONFIG, JSON.stringify(this.billingConfig));
+        idbSet(STORAGE_KEYS.BILLING_CONFIG, this.billingConfig).catch(() => {});
+        changed = true;
+      }
+
+      const remoteClients = await supabaseService.fetchClients();
+      if (remoteClients && remoteClients.length > 0) {
+        let salonChanged = false;
+        remoteClients.forEach((rc) => {
+          const idx = this.salons.findIndex((s) => s.id === rc.id);
+          if (idx !== -1) {
+            this.salons[idx] = {
+              ...this.salons[idx],
+              ...(rc.valor_mensal !== undefined ? { valor_mensal: rc.valor_mensal } : {}),
+              ...(rc.estado_subscricao ? { estado_subscricao: rc.estado_subscricao } : {}),
+              ...(rc.fim_prova ? { fim_prova: rc.fim_prova } : {}),
+              ...(rc.status ? { status: rc.status } : {}),
+            };
+            salonChanged = true;
+          }
+        });
+        if (salonChanged) {
+          saveToStorage(STORAGE_KEYS.SALONS, this.salons);
+          changed = true;
+        }
+      }
+
+      const remotePayments = await supabaseService.fetchPayments();
+      if (remotePayments && remotePayments.length > 0) {
+        const paymentMap = new Map<string, SubscriptionPayment>();
+        this.subscriptionPayments.forEach((p) => paymentMap.set(p.id, p));
+        remotePayments.forEach((p) => paymentMap.set(p.id, p));
+        this.subscriptionPayments = Array.from(paymentMap.values());
+        saveToStorage(STORAGE_KEYS.SUBSCRIPTION_PAYMENTS, this.subscriptionPayments);
+        changed = true;
+      }
+
+      if (changed) {
+        notifyStorageSync();
+      }
+      return changed;
+    } catch {
+      return false;
+    }
   }
 
   // Obter Pagamentos de Subscrição (todos ou filtrados por salão)

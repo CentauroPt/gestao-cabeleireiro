@@ -46,6 +46,31 @@ export class SupabaseService {
   }
 
   /**
+   * Carregar clientes/salões SaaS do Supabase
+   */
+  async fetchClients(): Promise<Partial<Salon>[] | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.from('clientes_saas').select('*');
+      if (error || !data) return null;
+      return data.map((d: any) => ({
+        id: d.id,
+        name: d.nome || d.name,
+        email: d.email,
+        phone: d.telefone || d.phone,
+        data_registo: d.data_registo,
+        fim_prova: d.fim_prova,
+        valor_mensal: d.valor_mensal !== undefined ? Number(d.valor_mensal) : undefined,
+        estado_subscricao: d.estado_subscricao,
+        ultimo_mes_pago: d.ultimo_mes_pago,
+        status: d.estado_subscricao === 'bloqueado' ? 'SUSPENSO' : 'ATIVO',
+      }));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Sincronizar pagamento com o Supabase
    */
   async syncPayment(payment: SubscriptionPayment): Promise<void> {

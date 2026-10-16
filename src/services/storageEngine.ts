@@ -39,6 +39,38 @@ export function onStorageSync(listener: StorageSyncListener): () => void {
   };
 }
 
+let storageChannel: BroadcastChannel | null = null;
+if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+  try {
+    storageChannel = new BroadcastChannel('salao_storage_sync_channel');
+    storageChannel.onmessage = (event) => {
+      if (event.data?.type === 'sync') {
+        listeners.forEach((fn) => {
+          try {
+            fn();
+          } catch (e) {
+            console.error('Erro ao notificar listener de storage via canal:', e);
+          }
+        });
+      }
+    };
+  } catch {}
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key && Object.values(STORAGE_KEYS).includes(e.key as any)) {
+      listeners.forEach((fn) => {
+        try {
+          fn();
+        } catch (e) {
+          console.error('Erro ao notificar listener via evento storage:', e);
+        }
+      });
+    }
+  });
+}
+
 let syncTimeout: any = null;
 export function notifyStorageSync(): void {
   if (syncTimeout) clearTimeout(syncTimeout);
@@ -51,6 +83,11 @@ export function notifyStorageSync(): void {
         console.error('Erro ao notificar listener de storage:', e);
       }
     });
+    if (storageChannel) {
+      try {
+        storageChannel.postMessage({ type: 'sync', timestamp: Date.now() });
+      } catch {}
+    }
   }, 40);
 }
 
@@ -273,6 +310,25 @@ export async function syncAndMergeStorage(): Promise<boolean> {
         } catch {}
         changed = true;
       }
+    }
+
+    // Sincronizar e assegurar persistência das configurações de faturação SaaS (IBAN, MB Way, WhatsApp, Mensalidade)
+    try {
+      const lsConfigRaw = localStorage.getItem(STORAGE_KEYS.BILLING_CONFIG);
+      const idbConfig = await idbGet<any>(STORAGE_KEYS.BILLING_CONFIG);
+      if (lsConfigRaw && !idbConfig) {
+        await idbSet(STORAGE_KEYS.BILLING_CONFIG, JSON.parse(lsConfigRaw));
+      } else if (!lsConfigRaw && idbConfig) {
+        localStorage.setItem(STORAGE_KEYS.BILLING_CONFIG, JSON.stringify(idbConfig));
+        changed = true;
+      } else if (lsConfigRaw && idbConfig) {
+        const lsParsed = JSON.parse(lsConfigRaw);
+        const mergedConfig = { ...idbConfig, ...lsParsed };
+        localStorage.setItem(STORAGE_KEYS.BILLING_CONFIG, JSON.stringify(mergedConfig));
+        await idbSet(STORAGE_KEYS.BILLING_CONFIG, mergedConfig);
+      }
+    } catch (e) {
+      console.warn('Aviso: Falha ao sincronizar BILLING_CONFIG:', e);
     }
 
     if (changed) {
