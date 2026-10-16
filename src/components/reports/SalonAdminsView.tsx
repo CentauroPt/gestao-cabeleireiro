@@ -85,16 +85,16 @@ export const SalonAdminsView: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
-      {/* Top Banner de Gestão de Administradores */}
+      {/* Top Banner de Gestão Administrativa */}
       <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-purple-950 text-white p-6 sm:p-7 rounded-3xl shadow-md border border-purple-800/40 relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-purple-200 text-xs font-bold border border-white/15">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Controlo de Privilégios & Gestão Administrativa</span>
+              <span>Controlo de Privilégios & Acessos</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              Gestão de Administradores do Salão
+              Gestão Administrativa
             </h2>
           </div>
 

@@ -601,7 +601,7 @@ export const AdminReportsView: React.FC<AdminReportsViewProps> = ({ initialSecti
           }`}
         >
           <ShieldCheck className="w-4 h-4 shrink-0" />
-          <span>Gestão de Administradores</span>
+          <span>Gestão Administrativa</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-700 border border-purple-200">
             {salonAdmins.length}
           </span>
