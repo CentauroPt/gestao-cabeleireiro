@@ -26,7 +26,10 @@ export const Navbar: React.FC = () => {
     activeTab,
     setActiveTab,
     isAdminUnlocked,
+    currentLanguage,
   } = useApp();
+
+  const isEs = currentLanguage === 'es';
 
   const handleAdminClick = () => {
     if (currentUser?.role === 'ADMIN') {
@@ -34,13 +37,13 @@ export const Navbar: React.FC = () => {
       setNotification({
         type: 'info',
         message: isAdminUnlocked
-          ? 'Acedendo aos Relatórios de Vendas do Administrador.'
-          : 'Área do Administrador: Introduza a sua palavra-passe para aceder aos relatórios financeiros.',
+          ? (isEs ? 'Accediendo a los Informes de Ventas del Administrador.' : 'Acedendo aos Relatórios de Vendas do Administrador.')
+          : (isEs ? 'Área del Administrador: Introduzca su contraseña para acceder a los informes financieros.' : 'Área do Administrador: Introduza a sua palavra-passe para aceder aos relatórios financeiros.'),
       });
     } else {
       setNotification({
         type: 'info',
-        message: 'Acesso reservado ao Administrador do salão.',
+        message: isEs ? 'Acceso reservado al Administrador.' : 'Acesso reservado ao Administrador do salão.',
       });
     }
   };
@@ -62,7 +65,7 @@ export const Navbar: React.FC = () => {
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-purple-400 shrink-0" />
               <span>
-                MODO DE INSPEÇÃO DO PROGRAMADOR — A visualizar salão:{' '}
+                {isEs ? 'MODO DE INSPECCIÓN DEL PROGRAMADOR — Visualizando:' : 'MODO DE INSPEÇÃO DO PROGRAMADOR — A visualizar salão:'}{' '}
                 <span className="text-white underline">{currentSalon?.name}</span> ({currentSalon?.status})
               </span>
             </div>
@@ -72,14 +75,14 @@ export const Navbar: React.FC = () => {
                 className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center gap-1 shadow-xs"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                Voltar à Consola
+                {isEs ? 'Volver a la Consola' : 'Voltar à Consola'}
               </button>
               <button
                 onClick={logoutDeveloper}
                 className="px-3 py-1 bg-rose-600/80 hover:bg-rose-600 text-white rounded-lg text-xs font-bold cursor-pointer transition-colors flex items-center gap-1 shadow-xs"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                Sair para Início
+                {isEs ? 'Salir a Inicio' : 'Sair para Início'}
               </button>
             </div>
           </div>
@@ -110,9 +113,11 @@ export const Navbar: React.FC = () => {
             )}
             <div>
               <span className="font-bold text-lg text-slate-900 tracking-tight flex items-center gap-2">
-                {currentSalon?.name || 'SalãoMaster Pro'}
+                {currentSalon?.name || (isEs ? 'Peluquería Master' : 'SalãoMaster Pro')}
               </span>
-              <p className="text-xs text-slate-500 hidden sm:block">Gestão de Clientes, Reservas & Equipa</p>
+              <p className="text-xs text-slate-500 hidden sm:block">
+                {isEs ? 'Gestión de Clientes, Citas & Equipo' : 'Gestão de Clientes, Reservas & Equipa'}
+              </p>
             </div>
           </div>
 
@@ -123,10 +128,10 @@ export const Navbar: React.FC = () => {
               <Store className="w-4 h-4 text-purple-600 shrink-0" />
               <div className="flex flex-col">
                 <span className="text-[10px] text-purple-600 font-semibold uppercase tracking-wider leading-none">
-                  Salão Ativo:
+                  {isEs ? 'Peluquería Activa:' : 'Salão Ativo:'}
                 </span>
                 <span className="text-xs font-bold text-slate-900 truncate max-w-[120px] sm:max-w-[180px]">
-                  {currentSalon?.name || 'O Meu Salão'}
+                  {currentSalon?.name || (isEs ? 'Mi Peluquería' : 'O Meu Salão')}
                 </span>
               </div>
             </div>
@@ -145,8 +150,8 @@ export const Navbar: React.FC = () => {
                 }`}
                 title={
                   currentUser.role === 'ADMIN'
-                    ? 'Clique para aceder à Área de Administrador (Relatórios de Vendas)'
-                    : 'Perfil de Colaborador (Clique para informação)'
+                    ? (isEs ? 'Haga clic para acceder al Área de Administrador' : 'Clique para aceder à Área de Administrador (Relatórios de Vendas)')
+                    : (isEs ? 'Perfil de Empleado' : 'Perfil de Colaborador (Clique para informação)')
                 }
               >
                 {currentUser.role === 'ADMIN' ? (
@@ -160,7 +165,7 @@ export const Navbar: React.FC = () => {
                     )}
                   </>
                 ) : (
-                  <span>{currentUser.role}</span>
+                  <span>{isEs ? 'EMPLEADO' : 'COLABORADOR'}</span>
                 )}
               </button>
             )}
@@ -168,7 +173,7 @@ export const Navbar: React.FC = () => {
             {/* Botão Sair / Terminar Sessão do Salão */}
             <button
               onClick={handleLogout}
-              title={isImpersonating ? "Sair da inspeção e voltar à Página de Entrada" : "Sair do salão e voltar à Página de Entrada"}
+              title={isImpersonating ? (isEs ? 'Salir de la inspección' : 'Sair da inspeção e voltar à Página de Entrada') : (isEs ? 'Cerrar sesión' : 'Sair do salão e voltar à Página de Entrada')}
               className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />

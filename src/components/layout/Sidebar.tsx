@@ -10,7 +10,8 @@ interface Props {
 }
 
 export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
-  const { clients, currentUser } = useApp();
+  const { clients, currentUser, currentLanguage } = useApp();
+  const isEs = currentLanguage === 'es';
 
   // Conta quantos clientes estão inativos (+60 dias) para mostrar no badge
   const inactiveCount = clients.filter((c) => {
@@ -24,28 +25,28 @@ export const Sidebar: React.FC<Props> = ({ activeTab, setActiveTab }) => {
   const menuItems = [
     {
       id: 'calendar' as TabType,
-      label: 'Agenda de Reservas',
+      label: isEs ? 'Citas & Agenda' : 'Agenda de Reservas',
       icon: <Calendar className="w-5 h-5" />,
       badge: null,
     },
     {
       id: 'services' as TabType,
-      label: 'Catálogo de Serviços',
+      label: isEs ? 'Catálogo de Servicios' : 'Catálogo de Serviços',
       icon: <Scissors className="w-5 h-5" />,
       badge: null,
     },
     {
       id: 'clients' as TabType,
-      label: 'Fichas de Clientes',
+      label: isEs ? 'Fichas de Clientes' : 'Fichas de Clientes',
       icon: <Users className="w-5 h-5" />,
-      badge: inactiveCount > 0 ? `${inactiveCount} alertas` : null,
+      badge: inactiveCount > 0 ? (isEs ? `${inactiveCount} alertas` : `${inactiveCount} alertas`) : null,
       badgeColor: 'bg-rose-100 text-rose-700',
     },
     {
       id: 'staff' as TabType,
-      label: 'Equipa & Colaboradores',
+      label: isEs ? 'Equipo & Empleados' : 'Equipa & Colaboradores',
       icon: <UserCheck className="w-5 h-5" />,
-      badge: !isAdmin ? 'Apenas Admin' : null,
+      badge: !isAdmin ? (isEs ? 'Solo Admin' : 'Apenas Admin') : null,
       badgeColor: 'bg-amber-100 text-amber-800 text-[10px]',
     },
   ];

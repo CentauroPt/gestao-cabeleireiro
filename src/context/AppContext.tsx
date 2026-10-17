@@ -13,6 +13,8 @@ import type {
   SubscriptionStats,
   SubscriptionStatus,
   PaymentMethod,
+  CountryCode,
+  LanguageCode,
 } from '../types';
 import { api, type SalonSummary } from '../services/api';
 import {
@@ -28,10 +30,18 @@ import {
   addMinutesToTime,
   isPastAppointment,
 } from '../services/conflictValidator';
+import { t, type TranslationKey, countryToLanguage, languageToCountry } from '../services/i18n';
 
 export type AppMode = 'landing' | 'salon' | 'developer';
 
 interface AppContextType {
+  // Mercado Regional e Idioma (Espanha / Portugal)
+  currentCountry: CountryCode;
+  setCountry: (country: CountryCode) => void;
+  currentLanguage: LanguageCode;
+  setLanguage: (language: LanguageCode) => void;
+  t: (key: TranslationKey) => string;
+
   // Navegação Global da Aplicação
   appMode: AppMode;
   setAppMode: (mode: AppMode) => void;
@@ -70,8 +80,12 @@ interface AppContextType {
   refreshSubscriptionData: () => Promise<void>;
   getSubscriptionStats: () => Promise<SubscriptionStats>;
 
-  // Autenticação de Utilizador do Salão (Login e Logout)
-  loginSalonUser: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  // Autenticação de Utilizador do Salão (Login e Logout com Segregação de Mercado)
+  loginSalonUser: (
+    email: string,
+    password?: string,
+    targetCountry?: CountryCode
+  ) => Promise<{ success: boolean; error?: string }>;
   logoutCurrentSalon: () => void;
 
   // Controlo do Programador (Super Admin)
@@ -159,6 +173,8 @@ interface AppContextType {
       trialDays?: number;
       fim_prova?: string;
       estado_subscricao?: SubscriptionStatus;
+      country?: CountryCode;
+      language?: LanguageCode;
     },
     options?: { stayInCurrentMode?: boolean }
   ) => Promise<boolean>;
@@ -205,6 +221,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isDevLoggedIn, setIsDevLoggedIn] = useState<boolean>(initialSession?.appMode === 'developer');
   const [isImpersonating, setIsImpersonating] = useState<boolean>(false);
   const [allSalonsSummary, setAllSalonsSummary] = useState<SalonSummary[]>([]);
+
+  // Mercado Regional e Idioma (Espanha / Portugal)
+  const [currentCountry, setCurrentCountryState] = useState<CountryCode>(() => {
+    try {
+      const saved = localStorage.getItem('salaomaster_country') as CountryCode;
+      if (saved === 'ES' || saved === 'PT') return saved;
+    } catch {}
+    return 'PT';
+  });
+
+  const [currentLanguage, setCurrentLanguageState] = useState<LanguageCode>(() => {
+    try {
+      const saved = localStorage.getItem('salaomaster_language') as LanguageCode;
+      if (saved === 'es' || saved === 'pt') return saved;
+    } catch {}
+    return 'pt';
+  });
+
+  const setCountry = useCallback((c: CountryCode) => {
+    setCurrentCountryState(c);
+    const lang = countryToLanguage(c);
+    setCurrentLanguageState(lang);
+    try {
+      localStorage.setItem('salaomaster_country', c);
+      localStorage.setItem('salaomaster_language', lang);
+    } catch {}
+  }, []);
+
+  const setLanguage = useCallback((l: LanguageCode) => {
+    setCurrentLanguageState(l);
+    const country = languageToCountry(l);
+    setCurrentCountryState(country);
+    try {
+      localStorage.setItem('salaomaster_language', l);
+      localStorage.setItem('salaomaster_country', country);
+    } catch {}
+  }, []);
+
+  const translate = useCallback((key: TranslationKey): string => {
+    return t(key, currentLanguage);
+  }, [currentLanguage]);
 
   const [salons, setSalons] = useState<Salon[]>([]);
   const [currentSalonId, setCurrentSalonIdState] = useState<string>(initialSession?.salonId || '');
@@ -383,6 +440,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const currentSalon = useMemo(() => {
     return salons.find((s) => s.id === currentSalonId) || null;
   }, [salons, currentSalonId]);
+
+  useEffect(() => {
+    if (currentSalon) {
+      const sCountry: CountryCode = currentSalon.country || 'PT';
+      const sLang: LanguageCode = currentSalon.language || (sCountry === 'ES' ? 'es' : 'pt');
+      setCurrentCountryState(sCountry);
+      setCurrentLanguageState(sLang);
+    }
+  }, [currentSalon]);
 
   const currentUser = useMemo(() => {
     const found = users.find((u) => u.id === currentUserId);
@@ -765,20 +831,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Autenticação de Utilizador do Salão (Login na Landing Page)
-  const loginSalonUser = async (email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
+  // Autenticação de Utilizador do Salão (Login na Landing Page com Segregação de Mercados)
+  const loginSalonUser = async (
+    email: string,
+    password?: string,
+    targetCountry?: CountryCode
+  ): Promise<{ success: boolean; error?: string }> => {
+    const effectiveCountry: CountryCode = targetCountry || currentCountry || 'PT';
     try {
-      const { user, salon } = await api.loginUser(email, password);
+      const { user, salon } = await api.loginUser(email, password, effectiveCountry);
       setCurrentSalonIdState(salon.id);
       setCurrentUserIdState(user.id);
+      const salonLang: LanguageCode =
+        salon.language || (salon.country === 'ES' ? 'es' : 'pt');
+      setCurrentLanguageState(salonLang);
+      setCurrentCountryState(salon.country || effectiveCountry);
+      try {
+        localStorage.setItem('salaomaster_country', salon.country || effectiveCountry);
+        localStorage.setItem('salaomaster_language', salonLang);
+      } catch {}
       setIsImpersonating(false);
       setAppMode('salon');
       saveActiveSession({ appMode: 'salon', salonId: salon.id, userId: user.id });
       await refreshData(salon.id, user.id);
-      showNotification('success', `Sessão iniciada no salão "${salon.name}".`);
+      showNotification(
+        'success',
+        salonLang === 'es'
+          ? `Sesión iniciada en el salón "${salon.name}".`
+          : `Sessão iniciada no salão "${salon.name}".`
+      );
       return { success: true };
     } catch (err: any) {
-      showNotification('error', err.message || 'Erro ao iniciar sessão no salão.');
+      showNotification(
+        'error',
+        err.message ||
+          (effectiveCountry === 'ES' ? 'El usuario no existe.' : 'O utilizador não existe.')
+      );
       return { success: false, error: err.message };
     }
   };
@@ -917,24 +1005,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       trialDays?: number;
       fim_prova?: string;
       estado_subscricao?: SubscriptionStatus;
+      country?: CountryCode;
+      language?: LanguageCode;
     },
     options?: { stayInCurrentMode?: boolean }
   ): Promise<boolean> => {
     try {
-      const { salon, adminUser } = await api.registerSalon(params);
+      const targetCountry: CountryCode = params.country || currentCountry || 'PT';
+      const targetLanguage: LanguageCode =
+        params.language || (targetCountry === 'ES' ? 'es' : 'pt');
+
+      const { salon, adminUser } = await api.registerSalon({
+        ...params,
+        country: targetCountry,
+        language: targetLanguage,
+      });
 
       if (!options?.stayInCurrentMode && appMode !== 'developer') {
+        setCurrentCountryState(targetCountry);
+        setCurrentLanguageState(targetLanguage);
+        try {
+          localStorage.setItem('salaomaster_country', targetCountry);
+          localStorage.setItem('salaomaster_language', targetLanguage);
+        } catch {}
         setCurrentSalonIdState(salon.id);
         setCurrentUserIdState(adminUser.id);
         setAppMode('salon');
         saveActiveSession({ appMode: 'salon', salonId: salon.id, userId: adminUser.id });
         await refreshData(salon.id, adminUser.id);
         await refreshAllSalonsSummary();
-        showNotification('success', `Salão "${salon.name}" registado com sucesso! Acedendo como ${adminUser.name}...`);
+        showNotification(
+          'success',
+          targetLanguage === 'es'
+            ? `¡Peluquería "${salon.name}" registrada con éxito! Accediendo como ${adminUser.name}...`
+            : `Salão "${salon.name}" registado com sucesso! Acedendo como ${adminUser.name}...`
+        );
       } else {
         await refreshData();
         await refreshAllSalonsSummary();
-        showNotification('success', `Salão "${salon.name}" registado com sucesso no sistema!`);
+        showNotification(
+          'success',
+          targetLanguage === 'es'
+            ? `¡Peluquería "${salon.name}" registrada con éxito!`
+            : `Salão "${salon.name}" registado com sucesso no sistema!`
+        );
       }
       return true;
     } catch (err: any) {
@@ -1313,6 +1427,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
+        currentCountry,
+        setCountry,
+        currentLanguage,
+        setLanguage,
+        t: translate,
         appMode,
         setAppMode,
         activeTab,

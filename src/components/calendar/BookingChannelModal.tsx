@@ -1,5 +1,6 @@
 import React from 'react';
 import type { BookingChannel } from '../../types';
+import { useApp } from '../../context/AppContext';
 import {
   UserCheck,
   PhoneCall,
@@ -20,6 +21,9 @@ export const BookingChannelModal: React.FC<Props> = ({
   onSelectChannel,
   onClose,
 }) => {
+  const { currentLanguage } = useApp();
+  const isEs = currentLanguage === 'es';
+
   if (!isOpen) return null;
 
   const channels: {
@@ -34,17 +38,21 @@ export const BookingChannelModal: React.FC<Props> = ({
     {
       id: 'presencial',
       label: 'Presencial',
-      description: 'Cliente presente diretamente ao balcão ou no salão.',
-      badge: 'Balcão / Salão',
+      description: isEs
+        ? 'El cliente acudió directamente al salón o mostrador.'
+        : 'Cliente presente diretamente ao balcão ou no salão.',
+      badge: isEs ? 'Mostrador / Salón' : 'Balcão / Salão',
       icon: <UserCheck className="w-6 h-6 text-purple-600" />,
       colorClasses: 'border-slate-200 hover:border-purple-500 hover:bg-purple-50/50 group',
       badgeClasses: 'bg-purple-100 text-purple-800 border-purple-200',
     },
     {
       id: 'telefone',
-      label: 'Chamada telefónica',
-      description: 'Marcação solicitada através de chamada telefónica de voz.',
-      badge: 'Chamada de Voz',
+      label: isEs ? 'Llamada telefónica' : 'Chamada telefónica',
+      description: isEs
+        ? 'Cita solicitada a través de llamada telefónica de voz.'
+        : 'Marcação solicitada através de chamada telefónica de voz.',
+      badge: isEs ? 'Llamada de Voz' : 'Chamada de Voz',
       icon: <PhoneCall className="w-6 h-6 text-blue-600" />,
       colorClasses: 'border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 group',
       badgeClasses: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -52,8 +60,10 @@ export const BookingChannelModal: React.FC<Props> = ({
     {
       id: 'whatsapp',
       label: 'WhatsApp',
-      description: 'Marcação recebida através de mensagem pelo WhatsApp.',
-      badge: 'Mensagem Direta',
+      description: isEs
+        ? 'Cita recibida a través de mensaje por WhatsApp.'
+        : 'Marcação recebida através de mensagem pelo WhatsApp.',
+      badge: isEs ? 'Mensaje Directo' : 'Mensagem Direta',
       icon: <MessageCircle className="w-6 h-6 text-emerald-600" />,
       colorClasses: 'border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 group',
       badgeClasses: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -71,9 +81,9 @@ export const BookingChannelModal: React.FC<Props> = ({
             </div>
             <div>
               <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/20 border border-white/20">
-                Novo Agendamento
+                {isEs ? 'Nueva Cita' : 'Novo Agendamento'}
               </span>
-              <h3 className="text-lg font-black mt-0.5">Tipo de Reserva</h3>
+              <h3 className="text-lg font-black mt-0.5">{isEs ? 'Tipo de Reserva' : 'Tipo de Reserva'}</h3>
             </div>
           </div>
 
@@ -81,7 +91,7 @@ export const BookingChannelModal: React.FC<Props> = ({
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-            title="Cancelar e fechar"
+            title={isEs ? 'Cancelar y cerrar' : 'Cancelar e fechar'}
           >
             <X className="w-5 h-5" />
           </button>
@@ -90,8 +100,17 @@ export const BookingChannelModal: React.FC<Props> = ({
         {/* Corpo com a lista de escolha */}
         <div className="p-6 space-y-4">
           <p className="text-xs text-slate-600 leading-relaxed">
-            Selecione por onde foi solicitada esta reserva. Estes dados alimentam a{' '}
-            <strong className="text-purple-700">Estatistica de reservas</strong> para saber por onde entram mais clientes:
+            {isEs ? (
+              <>
+                Seleccione por dónde se solicitó esta cita. Estos datos alimentan la{' '}
+                <strong className="text-purple-700">Estadística de reservas</strong> para saber por dónde entran más clientes:
+              </>
+            ) : (
+              <>
+                Selecione por onde foi solicitada esta reserva. Estes dados alimentam a{' '}
+                <strong className="text-purple-700">Estatistica de reservas</strong> para saber por onde entram mais clientes:
+              </>
+            )}
           </p>
 
           <div className="space-y-3">
@@ -129,13 +148,13 @@ export const BookingChannelModal: React.FC<Props> = ({
 
         {/* Rodapé */}
         <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>Escolha uma das 3 opções para prosseguir</span>
+          <span>{isEs ? 'Elija una de las 3 opciones para continuar' : 'Escolha uma das 3 opções para prosseguir'}</span>
           <button
             type="button"
             onClick={onClose}
             className="text-slate-600 hover:text-slate-900 font-bold px-3 py-1 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer"
           >
-            Cancelar
+            {isEs ? 'Cancelar' : 'Cancelar'}
           </button>
         </div>
       </div>

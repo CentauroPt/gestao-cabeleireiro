@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SalonStatus, SubscriptionPayment, SubscriptionStatus } from '../../types';
+import type { CountryCode, SalonStatus, SubscriptionPayment, SubscriptionStatus } from '../../types';
 import type { SalonSummary } from '../../services/api';
+import { SpainFlag, PortugalFlag } from '../common/FlagIcons';
 import { ClientSubscriptionDrawer } from './ClientSubscriptionDrawer';
 import { SubscriptionStatsPanel } from './SubscriptionStatsPanel';
 import { BillingConfigModal } from './BillingConfigModal';
@@ -53,7 +54,22 @@ export const DeveloperPortalView: React.FC = () => {
     setNotification,
     validateSubscriptionPayment,
     billingConfig,
+    currentCountry,
+    setCountry,
+    setLanguage,
   } = useApp();
+
+  // =========================================================================
+  // SELEÇÃO DAS DUAS PÁGINAS DISTINTAS DA CONSOLA (1º ESPANHA 🇪🇸, 2º PORTUGAL 🇵🇹)
+  // =========================================================================
+  const [devCountry, setDevCountry] = useState<CountryCode>(currentCountry || 'ES');
+  const isSpain = devCountry === 'ES';
+
+  const handleSelectCountry = (target: CountryCode) => {
+    setDevCountry(target);
+    setCountry(target);
+    setLanguage(target === 'ES' ? 'es' : 'pt');
+  };
 
   const [devTab, setDevTab] = useState<'salons' | 'stats' | 'bank_payments' | 'cloud_database'>('salons');
   const [selectedSalonForSubscription, setSelectedSalonForSubscription] = useState<SalonSummary | null>(null);
@@ -72,7 +88,9 @@ export const DeveloperPortalView: React.FC = () => {
 
   // Modal para suspender com motivo
   const [suspendingSalon, setSuspendingSalon] = useState<SalonSummary | null>(null);
-  const [suspensionReason, setSuspensionReason] = useState('Mensalidade ou termos pendentes de regularização');
+  const [suspensionReason, setSuspensionReason] = useState(
+    isSpain ? 'Mensualidad o términos pendientes de regularización' : 'Mensalidade ou termos pendentes de regularização'
+  );
 
   // Modal para registar novo salão pelo programador
   const [isNewSalonModalOpen, setIsNewSalonModalOpen] = useState(false);
@@ -123,12 +141,14 @@ export const DeveloperPortalView: React.FC = () => {
       await refreshAllSalonsSummary();
       setNotification({
         type: 'success',
-        message: 'Dados e salões atualizados com sucesso!',
+        message: isSpain
+          ? '¡Datos y peluquerías actualizados con éxito!'
+          : 'Dados e salões atualizados com sucesso!',
       });
     } catch (e: any) {
       setNotification({
         type: 'error',
-        message: 'Erro ao atualizar dados: ' + (e?.message || 'Falha de comunicação'),
+        message: (isSpain ? 'Error al actualizar datos: ' : 'Erro ao atualizar dados: ') + (e?.message || 'Falha de comunicação'),
       });
     } finally {
       setTimeout(() => {
@@ -141,28 +161,43 @@ export const DeveloperPortalView: React.FC = () => {
     refreshAllSalonsSummary();
   }, []);
 
-  // Estatísticas Globais
-  const totalSalons = allSalonsSummary.length;
-  const activeSalonsCount = allSalonsSummary.filter((s) => s.salon.status === 'ATIVO').length;
-  const suspendedSalonsCount = allSalonsSummary.filter((s) => s.salon.status === 'SUSPENSO').length;
-  const canceledSalonsCount = allSalonsSummary.filter((s) => s.salon.status === 'CANCELADO').length;
+  // =========================================================================
+  // DADOS ESPECÍFICOS DO PAÍS SELECIONADO NA CONSOLA
+  // =========================================================================
+  const countrySalons = useMemo(() => {
+    return allSalonsSummary.filter((item) =>
+      isSpain ? item.salon.country === 'ES' : (item.salon.country || 'PT') === 'PT'
+    );
+  }, [allSalonsSummary, isSpain]);
+
+  // Estatísticas no país selecionado
+  const totalSalons = countrySalons.length;
+  const activeSalonsCount = countrySalons.filter(
+    (s) => s.salon.status === 'ATIVO' && !s.isSubscriptionBlocked
+  ).length;
+  const suspendedSalonsCount = countrySalons.filter(
+    (s) => s.salon.status === 'SUSPENSO'
+  ).length;
+  const canceledSalonsCount = countrySalons.filter(
+    (s) => s.salon.status === 'CANCELADO'
+  ).length;
 
   const totalGlobalRevenue = useMemo(() => {
-    return allSalonsSummary.reduce((acc, s) => acc + s.totalRevenue, 0);
-  }, [allSalonsSummary]);
+    return countrySalons.reduce((acc, s) => acc + s.totalRevenue, 0);
+  }, [countrySalons]);
 
   const totalGlobalStaff = useMemo(() => {
-    return allSalonsSummary.reduce((acc, s) => acc + s.staffCount, 0);
-  }, [allSalonsSummary]);
+    return countrySalons.reduce((acc, s) => acc + s.staffCount, 0);
+  }, [countrySalons]);
 
   const totalGlobalClients = useMemo(() => {
-    return allSalonsSummary.reduce((acc, s) => acc + s.clientsCount, 0);
-  }, [allSalonsSummary]);
+    return countrySalons.reduce((acc, s) => acc + s.clientsCount, 0);
+  }, [countrySalons]);
 
-  // Pagamentos Pendentes de Validação (Gera Notificação na Consola)
+  // Pagamentos Pendentes de Validação (Filtrados pelo país do mercado selecionado)
   const allPendingPayments = useMemo(() => {
     const list: Array<{ payment: SubscriptionPayment; salonSummary: SalonSummary }> = [];
-    allSalonsSummary.forEach((item) => {
+    countrySalons.forEach((item) => {
       (item.payments || []).forEach((p) => {
         if (p.estado === 'pendente') {
           list.push({ payment: p, salonSummary: item });
@@ -170,27 +205,32 @@ export const DeveloperPortalView: React.FC = () => {
       });
     });
     return list;
-  }, [allSalonsSummary]);
+  }, [countrySalons]);
 
   const handleQuickValidate = async (paymentId: string) => {
     try {
-      await validateSubscriptionPayment(paymentId, 'Validado via Notificação Rápida');
+      await validateSubscriptionPayment(
+        paymentId,
+        isSpain ? 'Validado vía Notificación Rápida' : 'Validado via Notificação Rápida'
+      );
       await refreshAllSalonsSummary();
       setNotification({
         type: 'success',
-        message: 'Pagamento validado com sucesso! O salão foi desbloqueado imediatamente sem retenção.',
+        message: isSpain
+          ? '¡Pago validado con éxito! La peluquería ha sido desbloqueada inmediatamente.'
+          : 'Pagamento validado com sucesso! O salão foi desbloqueado imediatamente sem retenção.',
       });
     } catch (e: any) {
       setNotification({
         type: 'error',
-        message: 'Erro ao validar pagamento: ' + (e?.message || 'Falha de comunicação'),
+        message: (isSpain ? 'Error al validar pago: ' : 'Erro ao validar pagamento: ') + (e?.message || 'Falha de comunicação'),
       });
     }
   };
 
-  // Lista Filtrada
+  // Lista Filtrada por pesquisa e estado
   const filteredSalons = useMemo(() => {
-    return allSalonsSummary.filter((item) => {
+    return countrySalons.filter((item) => {
       const q = searchTerm.toLowerCase().trim();
       const matchesSearch =
         !q ||
@@ -205,11 +245,14 @@ export const DeveloperPortalView: React.FC = () => {
         (statusFilter === 'SUSPENSO' && item.salon.status === 'SUSPENSO') ||
         (statusFilter === 'CANCELADO' && item.salon.status === 'CANCELADO') ||
         (statusFilter === 'PROVA' && item.salon.estado_subscricao === 'prova' && !item.isSubscriptionBlocked) ||
-        (statusFilter === 'BLOQUEADO' && (item.isSubscriptionBlocked || item.salon.estado_subscricao === 'bloqueado' || item.salon.status === 'SUSPENSO'));
+        (statusFilter === 'BLOQUEADO' &&
+          (item.isSubscriptionBlocked ||
+            item.salon.estado_subscricao === 'bloqueado' ||
+            item.salon.status === 'SUSPENSO'));
 
       return matchesSearch && matchesStatus;
     });
-  }, [allSalonsSummary, searchTerm, statusFilter]);
+  }, [countrySalons, searchTerm, statusFilter]);
 
   // Confirmar Suspensão
   const handleConfirmSuspension = async () => {
@@ -225,23 +268,37 @@ export const DeveloperPortalView: React.FC = () => {
 
   // Cancelar
   const handleCancel = async (salonId: string) => {
-    if (confirm('Tem a certeza de que deseja CANCELAR este salão? Os colaboradores deixarão de conseguir entrar.')) {
-      await updateSalonStatus(salonId, 'CANCELADO', 'Subscrição cancelada pelo programador');
+    const confirmMsg = isSpain
+      ? '¿Está seguro de que desea CANCELAR esta peluquería? Los usuarios ya no podrán acceder.'
+      : 'Tem a certeza de que deseja CANCELAR este salão? Os colaboradores deixarão de conseguir entrar.';
+    if (confirm(confirmMsg)) {
+      await updateSalonStatus(
+        salonId,
+        'CANCELADO',
+        isSpain ? 'Suscripción cancelada por el programador' : 'Subscrição cancelada pelo programador'
+      );
     }
   };
 
   // Eliminar
   const handleDelete = async (salonId: string, salonName: string) => {
-    if (confirm(`ATENÇÃO: Deseja ELIMINAR PERMANENTEMENTE o salão "${salonName}" e todos os seus dados? Esta ação não pode ser desfeita.`)) {
+    const confirmMsg = isSpain
+      ? `ATENCIÓN: ¿Desea ELIMINAR PERMANENTEMENTE la peluquería "${salonName}" y todos sus datos? Esta acción no se puede deshacer.`
+      : `ATENÇÃO: Deseja ELIMINAR PERMANENTEMENTE o salão "${salonName}" e todos os seus dados? Esta ação não pode ser desfeita.`;
+    if (confirm(confirmMsg)) {
       await deleteSalon(salonId);
     }
   };
 
-  // Criar Salão pelo Programador
+  // Criar Salão pelo Programador no mercado ativo
   const handleCreateSalonSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSalonName || !newSalonPhone || !newSalonAdminName || !newSalonAdminEmail || !newSalonAdminPassword.trim()) {
-      alert('Por favor preencha todos os campos obrigatórios, incluindo a palavra-passe do administrador.');
+      alert(
+        isSpain
+          ? 'Por favor, complete todos los campos obligatorios, incluida la contraseña del administrador.'
+          : 'Por favor preencha todos os campos obrigatórios, incluindo a palavra-passe do administrador.'
+      );
       return;
     }
 
@@ -255,7 +312,9 @@ export const DeveloperPortalView: React.FC = () => {
       {
         name: newSalonName.trim(),
         phone: newSalonPhone.trim(),
-        address: newSalonAddress.trim() || 'Morada indicada pelo programador',
+        address:
+          newSalonAddress.trim() ||
+          (isSpain ? 'Dirección indicada por el programador' : 'Morada indicada pelo programador'),
         nif: newSalonNif.trim(),
         adminName: newSalonAdminName.trim(),
         adminEmail: newSalonAdminEmail.trim().toLowerCase(),
@@ -263,6 +322,8 @@ export const DeveloperPortalView: React.FC = () => {
         valor_mensal: validRate,
         trialDays: validDays,
         estado_subscricao: newSalonStatus,
+        country: devCountry,
+        language: isSpain ? 'es' : 'pt',
       },
       { stayInCurrentMode: true }
     );
@@ -292,11 +353,17 @@ export const DeveloperPortalView: React.FC = () => {
     e.preventDefault();
     setDevPasswordError('');
     if (!newDevPassword || newDevPassword.trim().length < 4) {
-      setDevPasswordError('A palavra-passe deve ter pelo menos 4 caracteres.');
+      setDevPasswordError(
+        isSpain
+          ? 'La contraseña debe tener al menos 4 caracteres.'
+          : 'A palavra-passe deve ter pelo menos 4 caracteres.'
+      );
       return;
     }
     if (newDevPassword !== confirmDevPassword) {
-      setDevPasswordError('As palavras-passe não coincidem.');
+      setDevPasswordError(
+        isSpain ? 'Las contraseñas no coinciden.' : 'As palavras-passe não coincidem.'
+      );
       return;
     }
     const success = changeDeveloperPassword(newDevPassword);
@@ -314,7 +381,11 @@ export const DeveloperPortalView: React.FC = () => {
     setSalonPasswordError('');
     const cleanPw = newSalonPassword.trim();
     if (!cleanPw || cleanPw.length < 3) {
-      setSalonPasswordError('Por favor introduza uma palavra-passe válida com pelo menos 3 caracteres.');
+      setSalonPasswordError(
+        isSpain
+          ? 'Por favor, introduzca una contraseña válida con al menos 3 caracteres.'
+          : 'Por favor introduza uma palavra-passe válida com pelo menos 3 caracteres.'
+      );
       return;
     }
     setIsSavingSalonPassword(true);
@@ -325,10 +396,14 @@ export const DeveloperPortalView: React.FC = () => {
         setNewSalonPassword('');
         setShowSalonPassword(false);
       } else {
-        setSalonPasswordError('Não foi possível gravar a palavra-passe. Por favor tente novamente.');
+        setSalonPasswordError(
+          isSpain
+            ? 'No fue posible guardar la contraseña. Por favor, intente de nuevo.'
+            : 'Não foi possível gravar a palavra-passe. Por favor tente novamente.'
+        );
       }
     } catch (err: any) {
-      setSalonPasswordError(err?.message || 'Erro ao atualizar palavra-passe.');
+      setSalonPasswordError(err?.message || (isSpain ? 'Error al actualizar contraseña.' : 'Erro ao atualizar palavra-passe.'));
     } finally {
       setIsSavingSalonPassword(false);
     }
@@ -363,6 +438,64 @@ export const DeveloperPortalView: React.FC = () => {
       )}
 
       <div className="max-w-7xl mx-auto space-y-6 print:hidden">
+        {/* =========================================================================
+            SELETOR PRINCIPAL DE PÁGINAS DA CONSOLA (ESTRITA ORDEM: 1º ESPANHA, 2º PORTUGAL)
+            ========================================================================= */}
+        <div className="bg-slate-800/90 border border-slate-700/80 rounded-3xl p-3.5 sm:p-4 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            {/* 1º ESPANHA (PRIMEIRO OBRIGATORIAMENTE) */}
+            <button
+              type="button"
+              onClick={() => handleSelectCountry('ES')}
+              className={`flex-1 sm:flex-initial px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+                isSpain
+                  ? 'bg-gradient-to-r from-red-600 via-amber-600 to-yellow-600 text-white shadow-lg ring-2 ring-yellow-400/60 scale-[1.02]'
+                  : 'bg-slate-900/60 text-slate-300 hover:bg-slate-700/80 hover:text-white border border-slate-700/60'
+              }`}
+            >
+              <SpainFlag size="lg" />
+              <span>Página de España</span>
+              <span
+                className={`text-[11px] px-2 py-0.5 rounded-full font-black ml-1 ${
+                  isSpain ? 'bg-black/35 text-yellow-200' : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {allSalonsSummary.filter((s) => s.salon.country === 'ES').length}
+              </span>
+            </button>
+
+            {/* 2º PORTUGAL (SEGUNDO) */}
+            <button
+              type="button"
+              onClick={() => handleSelectCountry('PT')}
+              className={`flex-1 sm:flex-initial px-5 py-3 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+                !isSpain
+                  ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-rose-600 text-white shadow-lg ring-2 ring-emerald-400/60 scale-[1.02]'
+                  : 'bg-slate-900/60 text-slate-300 hover:bg-slate-700/80 hover:text-white border border-slate-700/60'
+              }`}
+            >
+              <PortugalFlag size="lg" />
+              <span>Página de Portugal</span>
+              <span
+                className={`text-[11px] px-2 py-0.5 rounded-full font-black ml-1 ${
+                  !isSpain ? 'bg-black/35 text-emerald-200' : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {allSalonsSummary.filter((s) => (s.salon.country || 'PT') === 'PT').length}
+              </span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-300 bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-700/60">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>
+              {isSpain
+                ? 'Vista Actual: Mercado de España (Idioma Español)'
+                : 'Vista Atual: Mercado de Portugal (Português de Portugal)'}
+            </span>
+          </div>
+        </div>
+
         {/* Top Header */}
         <div className="bg-slate-800/90 border border-slate-700 rounded-3xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -374,13 +507,17 @@ export const DeveloperPortalView: React.FC = () => {
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   Super Admin
                 </span>
-                <span className="text-xs text-slate-400">• Painel de Controlo Master</span>
+                <span className="text-xs text-slate-400">
+                  • {isSpain ? 'Panel de Control Máster' : 'Painel de Controlo Master'}
+                </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5">
-                Consola de Gestão de Salões
+                {isSpain ? 'Consola de Gestión de Peluquerías' : 'Consola de Gestão de Salões'}
               </h1>
               <p className="text-xs text-slate-400 mt-0.5">
-                Supervisão de todos os salões registados, estados de atividade, suspensão e cancelamento.
+                {isSpain
+                  ? 'Supervisión de todas las peluquerías registradas en España, estados de actividad, suspensión y cancelación.'
+                  : 'Supervisão de todos os salões registados em Portugal, estados de atividade, suspensão e cancelamento.'}
               </p>
             </div>
           </div>
@@ -390,10 +527,14 @@ export const DeveloperPortalView: React.FC = () => {
               onClick={handleManualRefresh}
               disabled={isRefreshing}
               className="px-3.5 py-2 bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-75 shadow-xs"
-              title="Atualizar dados de todos os salões"
+              title={isSpain ? 'Actualizar datos de las peluquerías' : 'Atualizar dados de todos os salões'}
             >
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-purple-400' : ''}`} />
-              <span>{isRefreshing ? 'A atualizar...' : 'Atualizar'}</span>
+              <span>
+                {isRefreshing
+                  ? isSpain ? 'Actualizando...' : 'A atualizar...'
+                  : isSpain ? 'Actualizar' : 'Atualizar'}
+              </span>
             </button>
 
             <button
@@ -404,10 +545,10 @@ export const DeveloperPortalView: React.FC = () => {
                 setIsDevPasswordModalOpen(true);
               }}
               className="px-3.5 py-2 bg-slate-700/80 hover:bg-slate-700 text-purple-300 border border-purple-500/30 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Alterar palavra-passe master do programador"
+              title={isSpain ? 'Cambiar contraseña máster de programador' : 'Alterar palavra-passe master do programador'}
             >
               <Key className="w-4 h-4" />
-              <span>Alterar Senha Master</span>
+              <span>{isSpain ? 'Cambiar Contraseña Máster' : 'Alterar Senha Master'}</span>
             </button>
 
             <button
@@ -420,25 +561,24 @@ export const DeveloperPortalView: React.FC = () => {
               className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-md shadow-purple-600/30"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>+ Novo Salão</span>
+              <span>{isSpain ? '+ Nueva Peluquería' : '+ Novo Salão'}</span>
             </button>
 
             <button
               onClick={() => {
-                if (
-                  confirm(
-                    'ATENÇÃO: Deseja limpar a base de dados local? Todos os dados guardados em cache local serão limpos.'
-                  )
-                ) {
+                const warnMsg = isSpain
+                  ? 'ATENCIÓN: ¿Desea limpiar la base de datos local? Todos los datos guardados en caché local se limpiarán.'
+                  : 'ATENÇÃO: Deseja limpar a base de dados local? Todos os dados guardados em cache local serão limpos.';
+                if (confirm(warnMsg)) {
                   resetDemoData();
                   refreshAllSalonsSummary();
                 }
               }}
               className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Limpar dados locais do sistema"
+              title={isSpain ? 'Limpiar datos locales' : 'Limpar dados locais do sistema'}
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Limpar Dados</span>
+              <span>{isSpain ? 'Limpiar Datos' : 'Limpar Dados'}</span>
             </button>
 
             <button
@@ -446,7 +586,7 @@ export const DeveloperPortalView: React.FC = () => {
               className="px-3.5 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-              <span>Sair da Consola</span>
+              <span>{isSpain ? 'Cerrar Consola' : 'Sair da Consola'}</span>
             </button>
           </div>
         </div>
@@ -461,14 +601,16 @@ export const DeveloperPortalView: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-500/40">
-                    Notificação de Pagamento
+                    {isSpain ? 'Notificación de Pago' : 'Notificação de Pagamento'}
                   </span>
                   <span className="text-xs font-black text-white">
-                    {allPendingPayments.length} novo(s) pagamento(s) recebido(s)!
+                    {allPendingPayments.length} {isSpain ? 'nuevo(s) pago(s) recibido(s)!' : 'novo(s) pagamento(s) recebido(s)!'}
                   </span>
                 </div>
                 <p className="text-xs text-amber-300/80 mt-0.5">
-                  Existem comprovativos enviados pelos clientes a aguardar validação para desbloqueio imediato.
+                  {isSpain
+                    ? 'Existen comprobantes enviados por los clientes a la espera de validación para desbloqueo inmediato.'
+                    : 'Existem comprovativos enviados pelos clientes a aguardar validação para desbloqueio imediato.'}
                 </p>
               </div>
             </div>
@@ -487,16 +629,16 @@ export const DeveloperPortalView: React.FC = () => {
                   <button
                     onClick={() => handleQuickValidate(payment.id)}
                     className="ml-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] rounded-lg transition-colors cursor-pointer shadow-xs"
-                    title="Validar e desbloquear imediatamente"
+                    title={isSpain ? 'Validar y desbloquear inmediatamente' : 'Validar e desbloquear imediatamente'}
                   >
-                    Validar
+                    {isSpain ? 'Validar' : 'Validar'}
                   </button>
                   <button
                     onClick={() => setSelectedSalonForSubscription(salonSummary)}
                     className="px-2 py-1 text-slate-400 hover:text-white text-[11px] font-bold cursor-pointer"
-                    title="Abrir ficha de subscrição"
+                    title={isSpain ? 'Abrir ficha de suscripción' : 'Abrir ficha de subscrição'}
                   >
-                    Ficha
+                    {isSpain ? 'Ficha' : 'Ficha'}
                   </button>
                 </div>
               ))}
@@ -506,7 +648,7 @@ export const DeveloperPortalView: React.FC = () => {
 
         {/* Barra de Navegação entre Separadores da Consola */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setDevTab('salons')}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
@@ -516,7 +658,7 @@ export const DeveloperPortalView: React.FC = () => {
               }`}
             >
               <Store className="w-4 h-4" />
-              <span>Salões Registados</span>
+              <span>{isSpain ? 'Peluquerías Registradas' : 'Salões Registados'}</span>
               <span className="px-1.5 py-0.2 rounded-full bg-black/25 text-[10px] font-mono">
                 {totalSalons}
               </span>
@@ -531,7 +673,7 @@ export const DeveloperPortalView: React.FC = () => {
               }`}
             >
               <BarChart3 className="w-4 h-4" />
-              <span>Painel de Estatísticas SaaS</span>
+              <span>{isSpain ? 'Panel de Estadísticas SaaS' : 'Painel de Estatísticas SaaS'}</span>
             </button>
 
             <button
@@ -543,7 +685,7 @@ export const DeveloperPortalView: React.FC = () => {
               }`}
             >
               <CreditCard className="w-4 h-4" />
-              <span>Painel de Pagamentos Bancários</span>
+              <span>{isSpain ? 'Panel de Pagos Bancarios' : 'Painel de Pagamentos Bancários'}</span>
             </button>
 
             <button
@@ -555,17 +697,17 @@ export const DeveloperPortalView: React.FC = () => {
               }`}
             >
               <Database className="w-4 h-4" />
-              <span>Base de Dados na Nuvem (Supabase)</span>
+              <span>{isSpain ? 'Base de Datos en la Nube' : 'Base de Dados na Nuvem'}</span>
             </button>
           </div>
 
           <button
             onClick={() => setIsBillingConfigModalOpen(true)}
             className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto shadow-xs"
-            title="Configurar IBAN, MB Way e WhatsApp de faturação"
+            title={isSpain ? 'Configurar IBAN, MB Way y WhatsApp de facturación' : 'Configurar IBAN, MB Way e WhatsApp de faturação'}
           >
             <Sliders className="w-4 h-4" />
-            <span>Configuração Bancária & Preços</span>
+            <span>{isSpain ? 'Configuración Bancaria & Precios' : 'Configuração Bancária & Preços'}</span>
           </button>
         </div>
 
@@ -577,57 +719,73 @@ export const DeveloperPortalView: React.FC = () => {
           <CloudDatabasePanel />
         ) : (
           <>
-            {/* Global KPI Metrics Cards */}
+            {/* Global KPI Metrics Cards Scoped by Country */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
               <div className="bg-slate-800/80 border border-slate-700/80 p-4 rounded-2xl">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Salões Registados
+                  {isSpain ? 'Peluquerías Registradas' : 'Salões Registados'}
                 </div>
                 <div className="text-2xl font-black text-white">{totalSalons}</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">Total na plataforma</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  {isSpain ? 'Total en España' : 'Total em Portugal'}
+                </div>
               </div>
 
               <div className="bg-slate-800/80 border border-emerald-500/30 p-4 rounded-2xl">
                 <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Salões Ativos
+                  <CheckCircle2 className="w-3 h-3" /> {isSpain ? 'Peluquerías Activas' : 'Salões Ativos'}
                 </div>
                 <div className="text-2xl font-black text-emerald-400">{activeSalonsCount}</div>
-                <div className="text-[11px] text-emerald-500/80 mt-0.5">Operacionais</div>
+                <div className="text-[11px] text-emerald-500/80 mt-0.5">
+                  {isSpain ? 'Operacionales' : 'Operacionais'}
+                </div>
               </div>
 
               <div className="bg-slate-800/80 border border-amber-500/30 p-4 rounded-2xl">
                 <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <PauseCircle className="w-3 h-3" /> Suspensos
+                  <PauseCircle className="w-3 h-3" /> {isSpain ? 'Suspendidas' : 'Suspensos'}
                 </div>
                 <div className="text-2xl font-black text-amber-400">{suspendedSalonsCount}</div>
-                <div className="text-[11px] text-amber-500/80 mt-0.5">Bloqueados temp.</div>
+                <div className="text-[11px] text-amber-500/80 mt-0.5">
+                  {isSpain ? 'Bloqueadas temp.' : 'Bloqueados temp.'}
+                </div>
               </div>
 
               <div className="bg-slate-800/80 border border-rose-500/30 p-4 rounded-2xl">
                 <div className="text-[11px] font-bold text-rose-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <XCircle className="w-3 h-3" /> Cancelados
+                  <XCircle className="w-3 h-3" /> {isSpain ? 'Canceladas' : 'Cancelados'}
                 </div>
                 <div className="text-2xl font-black text-rose-400">{canceledSalonsCount}</div>
-                <div className="text-[11px] text-rose-500/80 mt-0.5">Sem subscrição</div>
+                <div className="text-[11px] text-rose-500/80 mt-0.5">
+                  {isSpain ? 'Sin suscripción' : 'Sem subscrição'}
+                </div>
               </div>
 
               <div className="bg-slate-800/80 border border-purple-500/30 p-4 rounded-2xl col-span-2 sm:col-span-1">
                 <div className="text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <Euro className="w-3 h-3" /> Faturação Global
+                  <Euro className="w-3 h-3" /> {isSpain ? 'Facturación Global' : 'Faturação Global'}
                 </div>
                 <div className="text-2xl font-black text-white">{totalGlobalRevenue.toFixed(2)}€</div>
-                <div className="text-[11px] text-purple-300 mt-0.5">{totalGlobalStaff} colaboradores • {totalGlobalClients} clientes</div>
+                <div className="text-[11px] text-purple-300 mt-0.5">
+                  {isSpain
+                    ? `${totalGlobalStaff} empleados • ${totalGlobalClients} clientes`
+                    : `${totalGlobalStaff} colaboradores • ${totalGlobalClients} clientes`}
+                </div>
               </div>
             </div>
 
-            {/* Barra de Pesquisa dos Nomes dos Salões (Imediatamente acima do bloco) */}
+            {/* Barra de Pesquisa dos Nomes dos Salões */}
             <div className="bg-slate-800/90 border border-slate-700 rounded-2xl p-3.5 sm:p-4 shadow-xl">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 text-purple-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Pesquisar salão pelo nome..."
+                    placeholder={
+                      isSpain
+                        ? 'Buscar por nombre de peluquería, correo o móvil en España...'
+                        : 'Pesquisar pelo nome do salão, e-mail ou telemóvel em Portugal...'
+                    }
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-9 py-2 text-sm bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all shadow-inner"
@@ -636,7 +794,7 @@ export const DeveloperPortalView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setSearchTerm('')}
-                      title="Limpar pesquisa"
+                      title={isSpain ? 'Limpiar búsqueda' : 'Limpar pesquisa'}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer p-0.5"
                     >
                       <X className="w-4 h-4" />
@@ -647,11 +805,13 @@ export const DeveloperPortalView: React.FC = () => {
                 <div className="flex items-center gap-2 shrink-0 justify-between sm:justify-end text-xs text-slate-400">
                   <span>
                     <strong className="text-white font-bold">{filteredSalons.length}</strong>{' '}
-                    {filteredSalons.length === 1 ? 'salão registado' : 'salões registados'}
+                    {filteredSalons.length === 1
+                      ? isSpain ? 'peluquería registrada' : 'salão registado'
+                      : isSpain ? 'peluquerías registradas' : 'salões registados'}
                   </span>
                   {searchTerm && (
                     <span className="text-purple-300 font-semibold bg-purple-950/70 border border-purple-800/60 px-2 py-0.5 rounded-md">
-                      A filtrar por: "{searchTerm}"
+                      {isSpain ? `Filtrando por: "${searchTerm}"` : `A filtrar por: "${searchTerm}"`}
                     </span>
                   )}
                 </div>
@@ -664,10 +824,14 @@ export const DeveloperPortalView: React.FC = () => {
                 <div>
                   <h2 className="text-lg font-bold text-white flex items-center gap-2">
                     <Store className="w-5 h-5 text-purple-400" />
-                    Gestão Master de Todos os Salões Registados
+                    {isSpain
+                      ? 'Gestión Máster de Peluquerías en España'
+                      : 'Gestão Master de Todos os Salões Registados'}
                   </h2>
                   <p className="text-xs text-slate-400">
-                    Pode gerir subscrições, suspender, reativar, cancelar ou inspecionar cada salão individualmente.
+                    {isSpain
+                      ? 'Puede gestionar suscripciones, suspender, reactivar, cancelar o inspeccionar cada peluquería individualmente.'
+                      : 'Pode gerir subscrições, suspender, reativar, cancelar ou inspecionar cada salão individualmente.'}
                   </p>
                 </div>
 
@@ -678,12 +842,12 @@ export const DeveloperPortalView: React.FC = () => {
                     onChange={(e) => setStatusFilter(e.target.value as any)}
                     className="px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-xl text-slate-200 outline-none cursor-pointer hover:border-slate-600 transition-colors"
                   >
-                    <option value="ALL">Todos os Estados</option>
-                    <option value="ATIVO">Subscrição Ativa</option>
-                    <option value="PROVA">Em Período de Teste</option>
-                    <option value="BLOQUEADO">Bloqueados / Pag. Pendente</option>
-                    <option value="SUSPENSO">Suspensos Manualmente</option>
-                    <option value="CANCELADO">Cancelados</option>
+                    <option value="ALL">{isSpain ? 'Todos los Estados' : 'Todos os Estados'}</option>
+                    <option value="ATIVO">{isSpain ? 'Suscripción Activa' : 'Subscrição Ativa'}</option>
+                    <option value="PROVA">{isSpain ? 'En Período de Prueba' : 'Em Período de Teste'}</option>
+                    <option value="BLOQUEADO">{isSpain ? 'Bloqueadas / Pago Pendiente' : 'Bloqueados / Pag. Pendente'}</option>
+                    <option value="SUSPENSO">{isSpain ? 'Suspendidas Manualmente' : 'Suspensos Manualmente'}</option>
+                    <option value="CANCELADO">{isSpain ? 'Canceladas' : 'Cancelados'}</option>
                   </select>
                 </div>
               </div>
@@ -693,230 +857,274 @@ export const DeveloperPortalView: React.FC = () => {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-700 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-900/40">
-                      <th className="py-3 px-3">Salão & Identificação</th>
-                      <th className="py-3 px-3">Data de Registo</th>
-                      <th className="py-3 px-3">Subscrição & Estado</th>
-                      <th className="py-3 px-3">Administrador</th>
-                      <th className="py-3 px-3 text-center">Colaboradores</th>
-                      <th className="py-3 px-3 text-center">Clientes</th>
-                      <th className="py-3 px-3 text-right">Faturação Total</th>
-                      <th className="py-3 px-3 text-right">Ações do Programador</th>
+                      <th className="py-3 px-3">
+                        {isSpain ? 'Peluquería & Identificación' : 'Salão & Identificação'}
+                      </th>
+                      <th className="py-3 px-3">
+                        {isSpain ? 'Fecha de Registro' : 'Data de Registo'}
+                      </th>
+                      <th className="py-3 px-3">
+                        {isSpain ? 'Suscripción & Estado' : 'Subscrição & Estado'}
+                      </th>
+                      <th className="py-3 px-3">
+                        {isSpain ? 'Administrador' : 'Administrador'}
+                      </th>
+                      <th className="py-3 px-3 text-center">
+                        {isSpain ? 'Empleados' : 'Colaboradores'}
+                      </th>
+                      <th className="py-3 px-3 text-center">
+                        {isSpain ? 'Clientes' : 'Clientes'}
+                      </th>
+                      <th className="py-3 px-3 text-right">
+                        {isSpain ? 'Facturación Total' : 'Faturação Total'}
+                      </th>
+                      <th className="py-3 px-3 text-right">
+                        {isSpain ? 'Acciones del Programador' : 'Ações do Programador'}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/60 text-xs text-slate-300">
-                    {filteredSalons.map((item) => {
-                      const s = item.salon;
-                      const isAtivo = s.status === 'ATIVO';
-                      const isSuspenso = s.status === 'SUSPENSO';
-                      const isCancelado = s.status === 'CANCELADO';
-                      const isBlocked = item.isSubscriptionBlocked;
-                      const isTrial = s.estado_subscricao === 'prova';
-                      const pendingCount = item.pendingPaymentsCount || 0;
-                      const formattedRegDate = s.createdAt
-                        ? new Date(s.createdAt).toLocaleDateString('pt-PT', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                          })
-                        : '—';
+                    {filteredSalons.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-slate-400 text-sm font-medium">
+                          {isSpain
+                            ? 'No hay peluquerías registradas en España todavía.'
+                            : 'Ainda não existem salões registados em Portugal.'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredSalons.map((item) => {
+                        const s = item.salon;
+                        const isAtivo = s.status === 'ATIVO';
+                        const isSuspenso = s.status === 'SUSPENSO';
+                        const isCancelado = s.status === 'CANCELADO';
+                        const isBlocked = item.isSubscriptionBlocked;
+                        const isTrial = s.estado_subscricao === 'prova';
+                        const pendingCount = item.pendingPaymentsCount || 0;
+                        const formattedRegDate = s.createdAt
+                          ? new Date(s.createdAt).toLocaleDateString(isSpain ? 'es-ES' : 'pt-PT', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                            })
+                          : '—';
 
-                      return (
-                        <tr key={s.id} className="hover:bg-slate-700/30 transition-colors">
-                          {/* Salão */}
-                          <td className="py-3 px-3">
-                            <div className="font-bold text-white text-sm">{s.name}</div>
-                            <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                              <MapPin className="w-3 h-3 text-slate-500" />
-                              <span>{s.address}</span>
-                              {s.nif && <span>• NIF: {s.nif}</span>}
-                            </div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">
-                              ID: <code className="bg-slate-900 px-1 rounded text-purple-300 font-mono">{s.id}</code>
-                            </div>
-                          </td>
+                        return (
+                          <tr key={s.id} className="hover:bg-slate-700/30 transition-colors">
+                            {/* Salão */}
+                            <td className="py-3 px-3">
+                              <div className="font-bold text-white text-sm flex items-center gap-2">
+                                <span>{s.name}</span>
+                                {s.country === 'ES' ? (
+                                  <SpainFlag size="sm" />
+                                ) : (
+                                  <PortugalFlag size="sm" />
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                <MapPin className="w-3 h-3 text-slate-500" />
+                                <span>{s.address}</span>
+                                {s.nif && <span>• NIF: {s.nif}</span>}
+                              </div>
+                              <div className="text-[10px] text-slate-500 mt-0.5">
+                                ID: <code className="bg-slate-900 px-1 rounded text-purple-300 font-mono">{s.id}</code>
+                              </div>
+                            </td>
 
-                          {/* Data de Registo */}
-                          <td className="py-3 px-3 whitespace-nowrap">
-                            <div className="inline-flex items-center gap-1.5 text-slate-200 font-semibold">
-                              <Calendar className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                              <span>{formattedRegDate}</span>
-                            </div>
-                          </td>
+                            {/* Data de Registo */}
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1.5 text-slate-200 font-semibold">
+                                <Calendar className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                                <span>{formattedRegDate}</span>
+                              </div>
+                            </td>
 
-                          {/* Subscrição & Estado */}
-                          <td className="py-3 px-3">
-                            <div className="space-y-1">
-                              {pendingCount > 0 && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
-                                  <Bell className="w-3 h-3 text-amber-400" />
-                                  <span>{pendingCount} Pag. Pendente</span>
+                            {/* Subscrição & Estado */}
+                            <td className="py-3 px-3">
+                              <div className="space-y-1">
+                                {pendingCount > 0 && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                                    <Bell className="w-3 h-3 text-amber-400" />
+                                    <span>
+                                      {pendingCount} {isSpain ? 'Pago Pendiente' : 'Pag. Pendente'}
+                                    </span>
+                                  </span>
+                                )}
+
+                                {isBlocked ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                    <AlertTriangle className="w-3 h-3 text-rose-400" />{' '}
+                                    {isSpain ? 'Bloqueada' : 'Bloqueado'}
+                                  </span>
+                                ) : isTrial ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                    <Clock className="w-3 h-3 text-indigo-400" />{' '}
+                                    {isSpain ? 'Prueba' : 'Prova'} ({item.daysRemainingInTrial ?? 0}d) • {(() => {
+                                      const rate = s.valor_mensal !== undefined ? Number(s.valor_mensal) : defaultGlobalRate;
+                                      return (rate % 1 === 0 ? rate.toFixed(0) : rate.toFixed(2)) + (isSpain ? '€/mes' : '€/mês');
+                                    })()}
+                                  </span>
+                                ) : isAtivo ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                    <CheckCircle2 className="w-3 h-3" /> {isSpain ? 'Activa' : 'Ativo'} • {(() => {
+                                      const rate = s.valor_mensal !== undefined ? Number(s.valor_mensal) : defaultGlobalRate;
+                                      return (rate % 1 === 0 ? rate.toFixed(0) : rate.toFixed(2)) + (isSpain ? '€/mes' : '€/mês');
+                                    })()}
+                                  </span>
+                                ) : isSuspenso ? (
+                                  <div>
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                      <PauseCircle className="w-3 h-3" /> {isSpain ? 'Suspendida' : 'Suspenso'}
+                                    </span>
+                                    {s.suspensionReason && (
+                                      <p className="text-[10px] text-amber-400/80 mt-1 max-w-[180px]">
+                                        {s.suspensionReason}
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : isCancelado ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                    <XCircle className="w-3 h-3" /> {isSpain ? 'Cancelada' : 'Cancelado'}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+
+                            {/* Administrador */}
+                            <td className="py-3 px-3">
+                              {item.adminUser ? (
+                                <div>
+                                  <div className="font-bold text-slate-200">{item.adminUser.name}</div>
+                                  <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                                    <Mail className="w-3 h-3 text-slate-500" />
+                                    <span>{item.adminUser.email}</span>
+                                  </div>
+                                  <div className="text-[10px] text-purple-300 font-mono mt-0.5 flex items-center gap-1">
+                                    <Key className="w-2.5 h-2.5 text-purple-400" />
+                                    <span>
+                                      {isSpain ? 'Contraseña: ' : 'Senha: '}
+                                      <strong>{item.adminUser.password ? '••••••••' : (isSpain ? 'No definida' : 'Não definida')}</strong>
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-slate-500 italic">
+                                  {isSpain ? 'Sin administrador' : 'Sem administrador'}
                                 </span>
                               )}
+                            </td>
 
-                              {isBlocked ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                                  <AlertTriangle className="w-3 h-3 text-rose-400" /> Bloqueado
-                                </span>
-                              ) : isTrial ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                                  <Clock className="w-3 h-3 text-indigo-400" /> Prova ({item.daysRemainingInTrial ?? 0}d) • {(() => {
-                                    const rate = s.valor_mensal !== undefined ? Number(s.valor_mensal) : defaultGlobalRate;
-                                    return (rate % 1 === 0 ? rate.toFixed(0) : rate.toFixed(2)) + '€/mês';
-                                  })()}
-                                </span>
-                              ) : isAtivo ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                  <CheckCircle2 className="w-3 h-3" /> Ativo • {(() => {
-                                    const rate = s.valor_mensal !== undefined ? Number(s.valor_mensal) : defaultGlobalRate;
-                                    return (rate % 1 === 0 ? rate.toFixed(0) : rate.toFixed(2)) + '€/mês';
-                                  })()}
-                                </span>
-                              ) : isSuspenso ? (
-                                <div>
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                    <PauseCircle className="w-3 h-3" /> Suspenso
-                                  </span>
-                                  {s.suspensionReason && (
-                                    <p className="text-[10px] text-amber-400/80 mt-1 max-w-[180px]">
-                                      {s.suspensionReason}
-                                    </p>
-                                  )}
-                                </div>
-                              ) : isCancelado ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                                  <XCircle className="w-3 h-3" /> Cancelado
-                                </span>
-                              ) : null}
-                            </div>
-                          </td>
+                            {/* Colaboradores / Empleados */}
+                            <td className="py-3 px-3 text-center font-bold text-slate-300">
+                              {item.staffCount}
+                            </td>
 
-                      {/* Administrador */}
-                      <td className="py-3 px-3">
-                        {item.adminUser ? (
-                          <div>
-                            <div className="font-bold text-slate-200">{item.adminUser.name}</div>
-                            <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-slate-500" />
-                              <span>{item.adminUser.email}</span>
-                            </div>
-                            <div className="text-[10px] text-purple-300 font-mono mt-0.5 flex items-center gap-1">
-                              <Key className="w-2.5 h-2.5 text-purple-400" />
-                              <span>Senha: <strong>{item.adminUser.password ? '••••••••' : 'Não definida'}</strong></span>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-slate-500 italic">Sem administrador</span>
-                        )}
-                      </td>
+                            {/* Clientes */}
+                            <td className="py-3 px-3 text-center font-bold text-slate-300">
+                              {item.clientsCount}
+                            </td>
 
-                      {/* Colaboradores */}
-                      <td className="py-3 px-3 text-center font-bold text-slate-300">
-                        {item.staffCount}
-                      </td>
+                            {/* Faturação Total */}
+                            <td className="py-3 px-3 text-right">
+                              <span className="font-extrabold text-white text-sm">
+                                {item.totalRevenue.toFixed(2)}€
+                              </span>
+                              <div className="text-[10px] text-slate-400">
+                                {item.appointmentsCount} {isSpain ? 'citas' : 'marcações'}
+                              </div>
+                            </td>
 
-                      {/* Clientes */}
-                      <td className="py-3 px-3 text-center font-bold text-slate-300">
-                        {item.clientsCount}
-                      </td>
+                            {/* Ações do Programador */}
+                            <td className="py-3 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                {/* Inspecionar / Entrar */}
+                                <button
+                                  onClick={() => impersonateSalon(s.id)}
+                                  className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-purple-500/30"
+                                  title={isSpain ? 'Inspeccionar peluquería en modo frontend' : 'Entrar no salão para inspecionar frontend'}
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span>{isSpain ? 'Inspeccionar' : 'Inspecionar'}</span>
+                                </button>
 
-                      {/* Faturação Total */}
-                      <td className="py-3 px-3 text-right">
-                        <span className="font-extrabold text-white text-sm">
-                          {item.totalRevenue.toFixed(2)}€
-                        </span>
-                        <div className="text-[10px] text-slate-400">{item.appointmentsCount} marcações</div>
-                      </td>
+                                {/* Suspender se estiver Ativo */}
+                                {isAtivo && (
+                                  <button
+                                    onClick={() => setSuspendingSalon(item)}
+                                    className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-amber-500/30"
+                                    title={isSpain ? 'Suspender esta peluquería' : 'Suspender este salão'}
+                                  >
+                                    <PauseCircle className="w-3 h-3" />
+                                    <span>{isSpain ? 'Suspender' : 'Suspender'}</span>
+                                  </button>
+                                )}
 
-                      {/* Ações do Programador */}
-                      <td className="py-3 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                          {/* Inspecionar / Entrar */}
-                          <button
-                            onClick={() => impersonateSalon(s.id)}
-                            className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-purple-500/30"
-                            title="Entrar no salão para inspecionar frontend"
-                          >
-                            <Eye className="w-3 h-3" />
-                            <span>Inspecionar</span>
-                          </button>
+                                {/* Reativar se estiver Suspenso ou Cancelado */}
+                                {(isSuspenso || isCancelado) && (
+                                  <button
+                                    onClick={() => handleReactivate(s.id)}
+                                    className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-emerald-500/30"
+                                    title={isSpain ? 'Reactivar peluquería a estado Activo' : 'Reativar salão para estado Ativo'}
+                                  >
+                                    <PlayCircle className="w-3 h-3" />
+                                    <span>{isSpain ? 'Reactivar' : 'Reativar'}</span>
+                                  </button>
+                                )}
 
-                          {/* Suspender se estiver Ativo */}
-                          {isAtivo && (
-                            <button
-                              onClick={() => setSuspendingSalon(item)}
-                              className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-amber-500/30"
-                              title="Suspender este salão"
-                            >
-                              <PauseCircle className="w-3 h-3" />
-                              <span>Suspender</span>
-                            </button>
-                          )}
+                                {/* Ficha de Subscrição SaaS */}
+                                <button
+                                  onClick={() => setSelectedSalonForSubscription(item)}
+                                  className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-purple-500/40"
+                                  title={isSpain ? 'Abrir Ficha de Suscripción del Cliente' : 'Abrir Ficha de Subscrição do Cliente'}
+                                >
+                                  <CreditCard className="w-3 h-3" />
+                                  <span>{isSpain ? 'Suscripción' : 'Subscrição'}</span>
+                                </button>
 
-                          {/* Reativar se estiver Suspenso ou Cancelado */}
-                          {(isSuspenso || isCancelado) && (
-                            <button
-                              onClick={() => handleReactivate(s.id)}
-                              className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-emerald-500/30"
-                              title="Reativar salão para estado Ativo"
-                            >
-                              <PlayCircle className="w-3 h-3" />
-                              <span>Reativar</span>
-                            </button>
-                          )}
+                                {/* Alterar Palavra-passe do Salão */}
+                                <button
+                                  onClick={() => {
+                                    setEditingSalonPassword(item);
+                                    setNewSalonPassword('');
+                                    setShowSalonPassword(true);
+                                    setSalonPasswordError('');
+                                  }}
+                                  className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-indigo-500/30"
+                                  title={isSpain ? 'Cambiar contraseña de administrador' : 'Alterar palavra-passe do administrador deste salão'}
+                                >
+                                  <Key className="w-3 h-3" />
+                                  <span>{isSpain ? 'Cambiar Contraseña' : 'Alterar Senha'}</span>
+                                </button>
 
-                          {/* Ficha de Subscrição SaaS */}
-                          <button
-                            onClick={() => setSelectedSalonForSubscription(item)}
-                            className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-purple-500/40"
-                            title="Abrir Ficha de Subscrição do Cliente"
-                          >
-                            <CreditCard className="w-3 h-3" />
-                            <span>Subscrição</span>
-                          </button>
+                                {/* Cancelar se não estiver Cancelado */}
+                                {!isCancelado && (
+                                  <button
+                                    onClick={() => handleCancel(s.id)}
+                                    className="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-rose-500/30"
+                                    title={isSpain ? 'Cancelar peluquería' : 'Cancelar salão'}
+                                  >
+                                    <XCircle className="w-3 h-3" />
+                                  </button>
+                                )}
 
-                          {/* Alterar Palavra-passe do Salão */}
-                          <button
-                            onClick={() => {
-                              setEditingSalonPassword(item);
-                              setNewSalonPassword('');
-                              setShowSalonPassword(true);
-                              setSalonPasswordError('');
-                            }}
-                            className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 border border-indigo-500/30"
-                            title="Alterar palavra-passe do administrador deste salão"
-                          >
-                            <Key className="w-3 h-3" />
-                            <span>Alterar Senha</span>
-                          </button>
-
-                          {/* Cancelar se não estiver Cancelado */}
-                          {!isCancelado && (
-                            <button
-                              onClick={() => handleCancel(s.id)}
-                              className="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-rose-500/30"
-                              title="Cancelar salão"
-                            >
-                              <XCircle className="w-3 h-3" />
-                            </button>
-                          )}
-
-                          {/* Eliminar permanentemente */}
-                          <button
-                            onClick={() => handleDelete(s.id, s.name)}
-                            className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
-                            title="Eliminar salão permanentemente"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                                {/* Eliminar permanentemente */}
+                                <button
+                                  onClick={() => handleDelete(s.id, s.name)}
+                                  className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                                  title={isSpain ? 'Eliminar peluquería permanentemente' : 'Eliminar salão permanentemente'}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -930,23 +1138,31 @@ export const DeveloperPortalView: React.FC = () => {
             </div>
 
             <h3 className="text-lg font-bold text-center text-white">
-              Suspender Salão "{suspendingSalon.salon.name}"
+              {isSpain
+                ? `Suspender Peluquería "${suspendingSalon.salon.name}"`
+                : `Suspender Salão "${suspendingSalon.salon.name}"`}
             </h3>
             <p className="text-xs text-slate-400 text-center mt-1">
-              Ao suspender este salão, os seus colaboradores e administradores ficarão impedidos de aceder ao sistema.
+              {isSpain
+                ? 'Al suspender esta peluquería, sus empleados y administradores tendrán el acceso bloqueado al sistema.'
+                : 'Ao suspender este salão, os seus colaboradores e administradores ficarão impedidos de aceder ao sistema.'}
             </p>
 
             <div className="mt-4 space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  Motivo da Suspensão
+                  {isSpain ? 'Motivo de la Suspensión' : 'Motivo da Suspensão'}
                 </label>
                 <textarea
                   rows={3}
                   value={suspensionReason}
                   onChange={(e) => setSuspensionReason(e.target.value)}
                   className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
-                  placeholder="Ex: Mensalidade em atraso, verificação de dados..."
+                  placeholder={
+                    isSpain
+                      ? 'Ej: Mensualidad en mora, comprobación de datos...'
+                      : 'Ex: Mensalidade em atraso, verificação de dados...'
+                  }
                 />
               </div>
 
@@ -955,13 +1171,13 @@ export const DeveloperPortalView: React.FC = () => {
                   onClick={() => setSuspendingSalon(null)}
                   className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl cursor-pointer"
                 >
-                  Cancelar
+                  {isSpain ? 'Cancelar' : 'Cancelar'}
                 </button>
                 <button
                   onClick={handleConfirmSuspension}
                   className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-900 text-xs font-bold rounded-xl cursor-pointer"
                 >
-                  Confirmar Suspensão
+                  {isSpain ? 'Confirmar Suspensión' : 'Confirmar Suspensão'}
                 </button>
               </div>
             </div>
@@ -969,26 +1185,33 @@ export const DeveloperPortalView: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de Criar Salão pelo Programador */}
+      {/* Modal de Criar Salão pelo Programador no mercado ativo */}
       {isNewSalonModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 print:hidden">
-          <div className="bg-slate-800 border border-slate-700 rounded-3xl max-w-lg w-full p-6 shadow-2xl text-slate-100">
-            <h3 className="text-lg font-bold text-white mb-1">
-              + Registar Novo Salão (Criado pelo Programador)
-            </h3>
+          <div className="bg-slate-800 border border-slate-700 rounded-3xl max-w-lg w-full p-6 shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center gap-2 mb-1">
+              {isSpain ? <SpainFlag size="md" /> : <PortugalFlag size="md" />}
+              <h3 className="text-lg font-bold text-white">
+                {isSpain
+                  ? '+ Registrar Nueva Peluquería en España'
+                  : '+ Registar Novo Salão em Portugal'}
+              </h3>
+            </div>
             <p className="text-xs text-slate-400 mb-4">
-              O salão será criado com arquitetura isolada e ficará disponível para o cliente entrar.
+              {isSpain
+                ? 'La peluquería será creada con arquitectura aislada en el mercado de España y estará disponible para el cliente.'
+                : 'O salão será criado com arquitetura isolada no mercado de Portugal e ficará disponível para o cliente entrar.'}
             </p>
 
             <form onSubmit={handleCreateSalonSubmit} className="space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  Nome do Salão *
+                  {isSpain ? 'Nombre de la Peluquería *' : 'Nome do Salão *'}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Espaço Beleza & Glamour"
+                  placeholder={isSpain ? 'Ej: Peluquería Glamour & Estilo' : 'Ex: Espaço Beleza & Glamour'}
                   value={newSalonName}
                   onChange={(e) => setNewSalonName(e.target.value)}
                   className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
@@ -998,12 +1221,12 @@ export const DeveloperPortalView: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Telefone *
+                    {isSpain ? 'Teléfono *' : 'Telemóvel *'}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="+351 912 345 678"
+                    placeholder={isSpain ? '+34 612 345 678' : '+351 912 345 678'}
                     value={newSalonPhone}
                     onChange={(e) => setNewSalonPhone(e.target.value)}
                     className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
@@ -1011,11 +1234,11 @@ export const DeveloperPortalView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    NIF
+                    {isSpain ? 'NIF / CIF' : 'NIF'}
                   </label>
                   <input
                     type="text"
-                    placeholder="509 123 456"
+                    placeholder={isSpain ? 'B12345678' : '509 123 456'}
                     value={newSalonNif}
                     onChange={(e) => setNewSalonNif(e.target.value)}
                     className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
@@ -1025,11 +1248,11 @@ export const DeveloperPortalView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  Morada
+                  {isSpain ? 'Dirección' : 'Morada'}
                 </label>
                 <input
                   type="text"
-                  placeholder="Rua, Cidade"
+                  placeholder={isSpain ? 'Calle Mayor, 12, Madrid' : 'Rua Principal, 12, Lisboa'}
                   value={newSalonAddress}
                   onChange={(e) => setNewSalonAddress(e.target.value)}
                   className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
@@ -1039,12 +1262,12 @@ export const DeveloperPortalView: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-700">
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Nome do Administrador *
+                    {isSpain ? 'Nombre del Administrador *' : 'Nome do Administrador *'}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Nome"
+                    placeholder={isSpain ? 'Carmen García' : 'Nome'}
                     value={newSalonAdminName}
                     onChange={(e) => setNewSalonAdminName(e.target.value)}
                     className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
@@ -1052,12 +1275,12 @@ export const DeveloperPortalView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    E-mail do Admin *
+                    {isSpain ? 'Correo del Administrador *' : 'E-mail do Admin *'}
                   </label>
                   <input
                     type="email"
                     required
-                    placeholder="email@salao.pt"
+                    placeholder={isSpain ? 'admin@peluqueria.es' : 'email@salao.pt'}
                     value={newSalonAdminEmail}
                     onChange={(e) => setNewSalonAdminEmail(e.target.value)}
                     className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
@@ -1067,13 +1290,13 @@ export const DeveloperPortalView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  Palavra-passe do Administrador *
+                  {isSpain ? 'Contraseña del Administrador *' : 'Palavra-passe do Administrador *'}
                 </label>
                 <div className="relative">
                   <input
                     type={showNewSalonPassword ? 'text' : 'password'}
                     required
-                    placeholder="Palavra-passe..."
+                    placeholder={isSpain ? 'Contraseña...' : 'Palavra-passe...'}
                     value={newSalonAdminPassword}
                     onChange={(e) => setNewSalonAdminPassword(e.target.value)}
                     className="w-full pl-3 pr-10 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500 font-mono"
@@ -1082,13 +1305,19 @@ export const DeveloperPortalView: React.FC = () => {
                     type="button"
                     onClick={() => setShowNewSalonPassword(!showNewSalonPassword)}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 cursor-pointer transition-colors"
-                    title={showNewSalonPassword ? 'Ocultar palavra-passe' : 'Mostrar palavra-passe'}
+                    title={
+                      showNewSalonPassword
+                        ? isSpain ? 'Ocultar contraseña' : 'Ocultar palavra-passe'
+                        : isSpain ? 'Mostrar contraseña' : 'Mostrar palavra-passe'
+                    }
                   >
                     {showNewSalonPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  Defina a palavra-passe de acesso inicial para o administrador deste salão.
+                  {isSpain
+                    ? 'Defina la contraseña de acceso inicial para el administrador.'
+                    : 'Defina a palavra-passe de acesso inicial para o administrador deste salão.'}
                 </span>
               </div>
 
@@ -1097,17 +1326,17 @@ export const DeveloperPortalView: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
                     <CreditCard className="w-3.5 h-3.5 text-purple-400" />
-                    Condições Contratuais Iniciais
+                    {isSpain ? 'Condiciones Contractuales Iniciales' : 'Condições Contratuais Iniciais'}
                   </span>
                   <span className="text-[10px] text-slate-400">
-                    Definido individualmente para este salão
+                    {isSpain ? 'Definido para esta peluquería' : 'Definido individualmente para este salão'}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      Valor Mensal (€)
+                      {isSpain ? 'Cuota Mensual (€)' : 'Valor Mensal (€)'}
                     </label>
                     <div className="relative">
                       <input
@@ -1120,17 +1349,17 @@ export const DeveloperPortalView: React.FC = () => {
                         className="w-full pl-3 pr-14 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-bold text-white focus:outline-none focus:border-purple-500 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold pointer-events-none select-none">
-                        €/mês
+                        {isSpain ? '€/mes' : '€/mês'}
                       </span>
                     </div>
                     <span className="text-[10px] text-slate-400 mt-1 block">
-                      Defeito: {defaultGlobalRate}€/mês
+                      {isSpain ? `Defecto: ${defaultGlobalRate}€/mes` : `Defeito: ${defaultGlobalRate}€/mês`}
                     </span>
                   </div>
 
                   <div>
                     <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      Período de Teste
+                      {isSpain ? 'Período de Prueba' : 'Período de Teste'}
                     </label>
                     <div className="relative">
                       <input
@@ -1142,23 +1371,23 @@ export const DeveloperPortalView: React.FC = () => {
                         className="w-full pl-3 pr-12 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-bold text-white focus:outline-none focus:border-purple-500 font-mono"
                       />
                       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px]">
-                        dias
+                        {isSpain ? 'días' : 'dias'}
                       </span>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      Estado Inicial
+                      {isSpain ? 'Estado Inicial' : 'Estado Inicial'}
                     </label>
                     <select
                       value={newSalonStatus}
                       onChange={(e) => setNewSalonStatus(e.target.value as any)}
                       className="w-full p-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-semibold text-white focus:outline-none focus:border-purple-500"
                     >
-                      <option value="prova">Período de Prova</option>
-                      <option value="ativo">Ativo / Regular</option>
-                      <option value="bloqueado">Suspenso / Bloqueado</option>
+                      <option value="prova">{isSpain ? 'Período de Prueba' : 'Período de Prova'}</option>
+                      <option value="ativo">{isSpain ? 'Activa / Regular' : 'Ativo / Regular'}</option>
+                      <option value="bloqueado">{isSpain ? 'Suspendida / Bloqueada' : 'Suspenso / Bloqueado'}</option>
                     </select>
                   </div>
                 </div>
@@ -1170,13 +1399,13 @@ export const DeveloperPortalView: React.FC = () => {
                   onClick={() => setIsNewSalonModalOpen(false)}
                   className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl cursor-pointer"
                 >
-                  Cancelar
+                  {isSpain ? 'Cancelar' : 'Cancelar'}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow-md"
                 >
-                  Registar Salão
+                  {isSpain ? 'Registrar Peluquería' : 'Registar Salão'}
                 </button>
               </div>
             </form>
@@ -1192,33 +1421,40 @@ export const DeveloperPortalView: React.FC = () => {
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-white">
-              Salão Registado com Sucesso!
+              {isSpain ? '¡Peluquería Registrada con Éxito!' : 'Salão Registado com Sucesso!'}
             </h3>
             <p className="text-xs text-slate-300 mt-1">
-              O salão foi gravado no sistema. Guarde as credenciais de acesso:
+              {isSpain
+                ? 'La peluquería ha sido guardada en el sistema. Guarde las credenciales:'
+                : 'O salão foi gravado no sistema. Guarde as credenciais de acesso:'}
             </p>
             <div className="mt-4 p-4 bg-slate-900 rounded-2xl border border-slate-700 text-left space-y-2.5 font-mono text-xs">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-1.5">
-                <span className="text-slate-400 font-sans">Nome do Salão:</span>
-                <span className="text-white font-bold">{createdSalonCredentials.salonName}</span>
+              <div>
+                <span className="text-slate-500 text-[11px] block">
+                  {isSpain ? 'Peluquería:' : 'Salão:'}
+                </span>
+                <span className="font-bold text-white">{createdSalonCredentials.salonName}</span>
               </div>
-              <div className="flex justify-between items-center border-b border-slate-800 pb-1.5">
-                <span className="text-slate-400 font-sans">E-mail:</span>
-                <span className="text-purple-300 font-bold">{createdSalonCredentials.email}</span>
+              <div>
+                <span className="text-slate-500 text-[11px] block">
+                  {isSpain ? 'Correo del Administrador:' : 'E-mail do Administrador:'}
+                </span>
+                <span className="font-bold text-purple-300">{createdSalonCredentials.email}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-sans">Palavra-passe:</span>
-                <span className="text-emerald-400 font-bold">{createdSalonCredentials.password}</span>
+              <div>
+                <span className="text-slate-500 text-[11px] block">
+                  {isSpain ? 'Contraseña Inicial:' : 'Palavra-passe Inicial:'}
+                </span>
+                <span className="font-bold text-emerald-400 text-sm">
+                  {createdSalonCredentials.password}
+                </span>
               </div>
             </div>
-            <p className="text-[11px] text-slate-400 mt-3">
-              O administrador deste salão já pode iniciar sessão diretamente na página de entrada.
-            </p>
             <button
               onClick={() => setCreatedSalonCredentials(null)}
-              className="mt-4 w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow-md transition-colors"
+              className="mt-5 w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl cursor-pointer"
             >
-              Compreendi e Guardei
+              {isSpain ? 'Comprendido y Cerrar' : 'Compreendi e Guardei'}
             </button>
           </div>
         </div>
@@ -1233,22 +1469,24 @@ export const DeveloperPortalView: React.FC = () => {
             </div>
 
             <h3 className="text-lg font-bold text-center text-white">
-              Alterar Senha do Programador
+              {isSpain ? 'Cambiar Contraseña del Programador' : 'Alterar Senha do Programador'}
             </h3>
             <p className="text-xs text-slate-400 text-center mt-1">
-              Defina uma nova palavra-passe de acesso a esta Consola Master.
+              {isSpain
+                ? 'Defina una nueva contraseña de acceso a esta Consola Máster.'
+                : 'Defina uma nova palavra-passe de acesso a esta Consola Master.'}
             </p>
 
             <form onSubmit={handleChangeDevPassword} className="mt-4 space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  Nova Palavra-passe *
+                  {isSpain ? 'Nueva Contraseña *' : 'Nova Palavra-passe *'}
                 </label>
                 <input
                   type="password"
                   required
                   autoFocus
-                  placeholder="Mínimo 4 caracteres..."
+                  placeholder={isSpain ? 'Mínimo 4 caracteres...' : 'Mínimo 4 caracteres...'}
                   value={newDevPassword}
                   onChange={(e) => setNewDevPassword(e.target.value)}
                   className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
@@ -1257,12 +1495,12 @@ export const DeveloperPortalView: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  Confirmar Nova Palavra-passe *
+                  {isSpain ? 'Confirmar Nueva Contraseña *' : 'Confirmar Nova Palavra-passe *'}
                 </label>
                 <input
                   type="password"
                   required
-                  placeholder="Repita a palavra-passe..."
+                  placeholder={isSpain ? 'Repita la contraseña...' : 'Repita a palavra-passe...'}
                   value={confirmDevPassword}
                   onChange={(e) => setConfirmDevPassword(e.target.value)}
                   className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500"
@@ -1281,13 +1519,13 @@ export const DeveloperPortalView: React.FC = () => {
                   onClick={() => setIsDevPasswordModalOpen(false)}
                   className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl cursor-pointer"
                 >
-                  Cancelar
+                  {isSpain ? 'Cancelar' : 'Cancelar'}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow-md"
                 >
-                  Guardar Senha
+                  {isSpain ? 'Guardar Contraseña' : 'Guardar Senha'}
                 </button>
               </div>
             </form>
@@ -1304,25 +1542,34 @@ export const DeveloperPortalView: React.FC = () => {
             </div>
 
             <h3 className="text-lg font-bold text-center text-white">
-              Alterar Palavra-passe do Salão
+              {isSpain ? 'Cambiar Contraseña de la Peluquería' : 'Alterar Palavra-passe do Salão'}
             </h3>
             <p className="text-sm text-indigo-300 font-semibold text-center mt-1">
               {editingSalonPassword.salon.name}
             </p>
             <p className="text-xs text-slate-400 text-center mt-0.5">
-              Administrador: <strong className="text-slate-300">{editingSalonPassword.adminUser?.name || `Administrador (${editingSalonPassword.salon.name})`}</strong> ({editingSalonPassword.adminUser?.email || editingSalonPassword.salon.phone || 'Sem e-mail registado'})
+              {isSpain ? 'Administrador: ' : 'Administrador: '}
+              <strong className="text-slate-300">
+                {editingSalonPassword.adminUser?.name ||
+                  (isSpain ? `Administrador (${editingSalonPassword.salon.name})` : `Administrador (${editingSalonPassword.salon.name})`)}
+              </strong>{' '}
+              ({editingSalonPassword.adminUser?.email || editingSalonPassword.salon.phone || (isSpain ? 'Sin correo registrado' : 'Sem e-mail registado')})
             </p>
 
             <form onSubmit={handleChangeSalonPassword} noValidate className="mt-4 space-y-3">
               <div>
                 <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  Nova Palavra-passe para o Salão *
+                  {isSpain ? 'Nueva Contraseña para la Peluquería *' : 'Nova Palavra-passe para o Salão *'}
                 </label>
                 <div className="relative">
                   <input
                     type={showSalonPassword ? 'text' : 'password'}
                     autoFocus
-                    placeholder="Introduza a nova palavra-passe (mín. 3 caracteres)..."
+                    placeholder={
+                      isSpain
+                        ? 'Introduzca la nueva contraseña (mín. 3 caracteres)...'
+                        : 'Introduza a nova palavra-passe (mín. 3 caracteres)...'
+                    }
                     value={newSalonPassword}
                     onChange={(e) => {
                       setNewSalonPassword(e.target.value);
@@ -1334,13 +1581,19 @@ export const DeveloperPortalView: React.FC = () => {
                     type="button"
                     onClick={() => setShowSalonPassword(!showSalonPassword)}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 cursor-pointer transition-colors"
-                    title={showSalonPassword ? 'Ocultar palavra-passe' : 'Mostrar palavra-passe'}
+                    title={
+                      showSalonPassword
+                        ? isSpain ? 'Ocultar contraseña' : 'Ocultar palavra-passe'
+                        : isSpain ? 'Mostrar contraseña' : 'Mostrar palavra-passe'
+                    }
                   >
                     {showSalonPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 <span className="text-[11px] text-slate-400 mt-1.5 block">
-                  Esta será a nova credencial para o salão aceder. Pode indicar esta palavra-passe diretamente ao proprietário do salão.
+                  {isSpain
+                    ? 'Esta será la nueva credencial para que la peluquería acceda al sistema.'
+                    : 'Esta será a nova credencial para o salão aceder. Pode indicar esta palavra-passe diretamente ao proprietário do salão.'}
                 </span>
               </div>
 
@@ -1357,14 +1610,16 @@ export const DeveloperPortalView: React.FC = () => {
                   onClick={() => setEditingSalonPassword(null)}
                   className="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold rounded-xl cursor-pointer"
                 >
-                  Cancelar
+                  {isSpain ? 'Cancelar' : 'Cancelar'}
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingSalonPassword}
                   className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow-md disabled:opacity-50 transition-colors"
                 >
-                  {isSavingSalonPassword ? 'A atualizar...' : 'Atualizar Senha'}
+                  {isSavingSalonPassword
+                    ? isSpain ? 'Actualizando...' : 'A atualizar...'
+                    : isSpain ? 'Actualizar Contraseña' : 'Atualizar Senha'}
                 </button>
               </div>
             </form>

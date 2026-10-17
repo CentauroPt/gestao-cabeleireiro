@@ -11,6 +11,8 @@ import type {
   SubscriptionStats,
   SubscriptionStatus,
   VisitHistoryItem,
+  CountryCode,
+  LanguageCode,
 } from '../types';
 import {
   STORAGE_KEYS,
@@ -256,9 +258,13 @@ export class ApiService {
 
   async createSalon(salonData: Omit<Salon, 'id'>): Promise<Salon> {
     this.reloadFromStorage();
+    const country: CountryCode = salonData.country || 'PT';
+    const language: LanguageCode = salonData.language || (country === 'ES' ? 'es' : 'pt');
     const newSalon: Salon = {
       id: `salon-${Date.now()}`,
       ...salonData,
+      country,
+      language,
       status: salonData.status || 'ATIVO',
       createdAt: salonData.createdAt || new Date().toISOString(),
     };
@@ -292,6 +298,8 @@ export class ApiService {
     trialDays?: number;
     fim_prova?: string;
     estado_subscricao?: SubscriptionStatus;
+    country?: CountryCode;
+    language?: LanguageCode;
   }): Promise<{ salon: Salon; adminUser: User }> {
     // Sincronizar armazenamento antes de validar e gravar
     await syncAndMergeStorage();
@@ -324,6 +332,10 @@ export class ApiService {
       params.valor_mensal !== undefined ? Number(params.valor_mensal) : defaultRate;
     const subscriptionStatus = params.estado_subscricao || 'prova';
 
+    const targetCountry: CountryCode = params.country || 'PT';
+    const targetLanguage: LanguageCode =
+      params.language || (targetCountry === 'ES' ? 'es' : 'pt');
+
     const newSalon: Salon = {
       id: salonId,
       name: cleanSalonName,
@@ -338,6 +350,8 @@ export class ApiService {
       createdAt: nowIso,
       primaryColor: '#8B5CF6',
       startDayOfWeek: 1,
+      country: targetCountry,
+      language: targetLanguage,
       // Faturação e Subscrição SaaS
       data_registo: nowIso,
       fim_prova: trialEndIso,
@@ -356,38 +370,68 @@ export class ApiService {
       isPrimaryAdmin: true,
       password: params.adminPassword?.trim() || undefined,
       color: '#8B5CF6',
-      specialties: ['Gestão', 'Cortes & Estilo'],
+      specialties: targetCountry === 'ES' ? ['Gestión', 'Cortes & Estilo'] : ['Gestão', 'Cortes & Estilo'],
       active: true,
+      country: targetCountry,
     };
 
-    // Criar serviços base para o novo salão (cada salão gere os seus)
-    const initialServices: Service[] = [
-      {
-        id: `serv-${Date.now()}-1`,
-        salonId,
-        name: 'Corte de Cabelo',
-        category: 'Cabelo',
-        durationMinutes: 30,
-        price: 20.0,
-        description: 'Corte e finalização personalizada.',
-      },
-      {
-        id: `serv-${Date.now()}-2`,
-        salonId,
-        name: 'Brushing & Lavagem',
-        category: 'Cabelo',
-        durationMinutes: 30,
-        price: 18.0,
-      },
-      {
-        id: `serv-${Date.now()}-3`,
-        salonId,
-        name: 'Coloração Completa',
-        category: 'Cabelo',
-        durationMinutes: 60,
-        price: 45.0,
-      },
-    ];
+    // Criar serviços base para o novo salão (cada salão gere os seus, adaptados ao idioma do mercado)
+    const initialServices: Service[] =
+      targetCountry === 'ES'
+        ? [
+            {
+              id: `serv-${Date.now()}-1`,
+              salonId,
+              name: 'Corte de Cabello',
+              category: 'Cabelo',
+              durationMinutes: 30,
+              price: 20.0,
+              description: 'Corte y peinado personalizado.',
+            },
+            {
+              id: `serv-${Date.now()}-2`,
+              salonId,
+              name: 'Lavado & Brushing',
+              category: 'Cabelo',
+              durationMinutes: 30,
+              price: 18.0,
+            },
+            {
+              id: `serv-${Date.now()}-3`,
+              salonId,
+              name: 'Coloración Completa',
+              category: 'Cabelo',
+              durationMinutes: 60,
+              price: 45.0,
+            },
+          ]
+        : [
+            {
+              id: `serv-${Date.now()}-1`,
+              salonId,
+              name: 'Corte de Cabelo',
+              category: 'Cabelo',
+              durationMinutes: 30,
+              price: 20.0,
+              description: 'Corte e finalização personalizada.',
+            },
+            {
+              id: `serv-${Date.now()}-2`,
+              salonId,
+              name: 'Brushing & Lavagem',
+              category: 'Cabelo',
+              durationMinutes: 30,
+              price: 18.0,
+            },
+            {
+              id: `serv-${Date.now()}-3`,
+              salonId,
+              name: 'Coloração Completa',
+              category: 'Cabelo',
+              durationMinutes: 60,
+              price: 45.0,
+            },
+          ];
 
     this.salons.push(newSalon);
     this.users.push(adminUser);
@@ -552,13 +596,22 @@ export class ApiService {
     });
   }
 
-  // Autenticação de Utilizador / Salão (Permite entrar por E-mail, Nome do Salão, Telefone ou Nome do Utilizador)
-  async loginUser(identifier: string, password?: string): Promise<{ user: User; salon: Salon }> {
+  // Autenticação de Utilizador / Salão com Segregação Rigorosa de Mercados (Espanha / Portugal)
+  async loginUser(
+    identifier: string,
+    password?: string,
+    targetCountry: CountryCode = 'PT'
+  ): Promise<{ user: User; salon: Salon }> {
     this.reloadFromStorage();
     const cleanInput = (identifier || '').trim();
     const cleanLower = cleanInput.toLowerCase();
     const cleanDigits = cleanInput.replace(/\D/g, '');
     const inputPassword = (password || '').trim();
+
+    const matchesCountry = (s: Salon) => {
+      const country: CountryCode = (s.country as CountryCode) || 'PT';
+      return country === targetCountry;
+    };
 
     const getCandidates = (): Array<{ user: User; salon: Salon }> => {
       const candidates: Array<{ user: User; salon: Salon }> = [];
@@ -567,7 +620,7 @@ export class ApiService {
       for (const u of this.users) {
         if ((u.email || '').trim().toLowerCase() === cleanLower) {
           const s = this.salons.find((salon) => salon.id === u.salonId);
-          if (s) candidates.push({ user: u, salon: s });
+          if (s && matchesCountry(s)) candidates.push({ user: u, salon: s });
         }
       }
 
@@ -577,7 +630,7 @@ export class ApiService {
           const uDigits = (u.phone || '').replace(/\D/g, '');
           if (uDigits === cleanDigits) {
             const s = this.salons.find((salon) => salon.id === u.salonId);
-            if (s && !candidates.some((c) => c.user.id === u.id)) {
+            if (s && matchesCountry(s) && !candidates.some((c) => c.user.id === u.id)) {
               candidates.push({ user: u, salon: s });
             }
           }
@@ -587,6 +640,7 @@ export class ApiService {
       // 3. Procurar por telefone exato do salão
       if (cleanDigits.length >= 6) {
         for (const s of this.salons) {
+          if (!matchesCountry(s)) continue;
           const sDigits = (s.phone || '').replace(/\D/g, '');
           if (sDigits === cleanDigits) {
             const adminUser =
@@ -601,6 +655,7 @@ export class ApiService {
 
       // 4. Procurar por NOME EXATO do Salão
       for (const s of this.salons) {
+        if (!matchesCountry(s)) continue;
         if ((s.name || '').trim().toLowerCase() === cleanLower) {
           const adminUser =
             this.users.find((u) => u.salonId === s.id && u.role === 'ADMIN') ||
@@ -615,7 +670,7 @@ export class ApiService {
       for (const u of this.users) {
         if ((u.name || '').trim().toLowerCase() === cleanLower) {
           const s = this.salons.find((salon) => salon.id === u.salonId);
-          if (s && !candidates.some((c) => c.user.id === u.id)) {
+          if (s && matchesCountry(s) && !candidates.some((c) => c.user.id === u.id)) {
             candidates.push({ user: u, salon: s });
           }
         }
@@ -626,7 +681,7 @@ export class ApiService {
         const uName = (u.name || '').trim().toLowerCase();
         if (uName.includes(cleanLower) || cleanLower.includes(uName)) {
           const s = this.salons.find((salon) => salon.id === u.salonId);
-          if (s && !candidates.some((c) => c.user.id === u.id)) {
+          if (s && matchesCountry(s) && !candidates.some((c) => c.user.id === u.id)) {
             candidates.push({ user: u, salon: s });
           }
         }
@@ -638,12 +693,13 @@ export class ApiService {
           const uDigits = (u.phone || '').replace(/\D/g, '');
           if (uDigits.endsWith(cleanDigits) || cleanDigits.endsWith(uDigits)) {
             const s = this.salons.find((salon) => salon.id === u.salonId);
-            if (s && !candidates.some((c) => c.user.id === u.id)) {
+            if (s && matchesCountry(s) && !candidates.some((c) => c.user.id === u.id)) {
               candidates.push({ user: u, salon: s });
             }
           }
         }
         for (const s of this.salons) {
+          if (!matchesCountry(s)) continue;
           const sDigits = (s.phone || '').replace(/\D/g, '');
           if (sDigits.endsWith(cleanDigits) || cleanDigits.endsWith(sDigits)) {
             const adminUser =
@@ -658,6 +714,7 @@ export class ApiService {
 
       // 7. Procurar por nome aproximado do salão
       for (const s of this.salons) {
+        if (!matchesCountry(s)) continue;
         const sName = (s.name || '').trim().toLowerCase();
         if (sName.includes(cleanLower) || cleanLower.includes(sName)) {
           const adminUser =
@@ -684,9 +741,12 @@ export class ApiService {
     }
 
     if (candidates.length === 0) {
-      throw new Error(
-        `Não foi encontrado nenhum salão ou utilizador correspondente a "${cleanInput}". Pode entrar com o seu e-mail, nome do salão ou telefone registado.`
-      );
+      // Requisito estrito do utilizador: "deve aparecer um quadro a informar que o utilizador não existe."
+      if (targetCountry === 'ES') {
+        throw new Error('El usuario no existe.');
+      } else {
+        throw new Error('O utilizador não existe.');
+      }
     }
 
     // Se houver mais do que um candidato e uma senha foi fornecida, priorizar o que corresponde à senha
@@ -708,20 +768,36 @@ export class ApiService {
 
     if (userPassword) {
       if (inputPassword !== userPassword && !isMasterPassword) {
-        throw new Error(`Palavra-passe incorreta para ${salon.name}. Por favor verifique a palavra-passe introduzida.`);
+        if (targetCountry === 'ES') {
+          throw new Error(`Contraseña incorrecta para ${salon.name}. Por favor, verifique la contraseña introducida.`);
+        } else {
+          throw new Error(`Palavra-passe incorreta para ${salon.name}. Por favor verifique a palavra-passe introduzida.`);
+        }
       }
     }
 
     if (salon.status === 'SUSPENSO') {
-      throw new Error(
-        `O salão "${salon.name}" encontra-se SUSPENSO. ${
-          salon.suspensionReason ? `Motivo: ${salon.suspensionReason}. ` : ''
-        }Por favor, contacte o suporte ou programador.`
-      );
+      if (targetCountry === 'ES') {
+        throw new Error(
+          `La peluquería "${salon.name}" se encuentra SUSPENDIDA. ${
+            salon.suspensionReason ? `Motivo: ${salon.suspensionReason}. ` : ''
+          }Por favor, contacte con el soporte o programador.`
+        );
+      } else {
+        throw new Error(
+          `O salão "${salon.name}" encontra-se SUSPENSO. ${
+            salon.suspensionReason ? `Motivo: ${salon.suspensionReason}. ` : ''
+          }Por favor, contacte o suporte ou programador.`
+        );
+      }
     }
 
     if (salon.status === 'CANCELADO') {
-      throw new Error(`A subscrição do salão "${salon.name}" foi CANCELADA.`);
+      if (targetCountry === 'ES') {
+        throw new Error(`La suscripción de la peluquería "${salon.name}" ha sido CANCELADA.`);
+      } else {
+        throw new Error(`A subscrição do salão "${salon.name}" foi CANCELADA.`);
+      }
     }
 
     return { user, salon };

@@ -6,6 +6,9 @@ export type SalonStatus = 'ATIVO' | 'SUSPENSO' | 'CANCELADO';
 
 export type SubscriptionStatus = 'ativo' | 'bloqueado' | 'prova';
 
+export type CountryCode = 'ES' | 'PT';
+export type LanguageCode = 'es' | 'pt';
+
 export interface Salon {
   id: string;
   name: string;
@@ -22,6 +25,10 @@ export interface Salon {
   primaryColor?: string; // Cor principal personalizada do salão (Hex)
   startDayOfWeek?: number; // Dia de início da semana (0 = Domingo, 1 = Segunda, 2 = Terça, ..., 6 = Sábado; padrão: 1)
   
+  // País e Idioma para Segregação de Mercados (Espanha / Portugal)
+  country?: CountryCode; // 'ES' | 'PT'
+  language?: LanguageCode; // 'es' | 'pt'
+
   // Dados de Subscrição SaaS
   email?: string;
   data_registo?: string; // Data de registo do salão (ISO)
@@ -45,6 +52,7 @@ export interface User {
   color: string; // Hex color for calendar, ex: #3B82F6
   specialties: string[]; // ex: ["Cortes", "Coloração"]
   active: boolean;
+  country?: CountryCode;
 }
 
 export interface Service {
